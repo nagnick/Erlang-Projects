@@ -3,4 +3,4 @@
 
 -export([print/0]).
 print()->
-  io:format("HELLOWORLD").
+  io:format("HELLOCake").
