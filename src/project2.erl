@@ -1,9 +1,17 @@
 
 -module(project2).
 
--export([gossipActor/0,superVisor/0,spawnMultipleActors/1]).
+-export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2]).
 
-linkInLine(1,List)->
+fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
+  PID = lists:nth(1,List),
+  PID ! [self()| List];
+fullLink(NumberInList,List)->
+  PID = lists:nth(NumberInList,List),
+  PID ! [self() | List],
+  fullLink(NumberInList-1,List).
+
+linkInLine(1,List)-> % give each actor its neighbor to the right & supervisor PID, last actor get only supervisor PID
   hd(List)! [self()],
   io:format("DONE~n");
 linkInLine(NumberInList,List)->
@@ -13,20 +21,21 @@ linkInLine(NumberInList,List)->
   PID ! [self()| hd(Rest)],
   linkInLine(NumberInList-1,Rest).
 
-superVisor()->
+superVisor()-> %% work in progress
   Actors = spawnMultipleActors(8),
   messageStructure(8,Actors,line).
 
 messageStructure(NumberOfActors,Actors, line)->
   linkInLine(NumberOfActors,Actors).
 
-gossipActor()->
+gossipActor()-> %% work in progress
   receive
     ListOfNeighbors->
-      gossipActor(ListOfNeighbors)
+      gossipActor(hd(ListOfNeighbors),tl(ListOfNeighbors))
   end.
-gossipActor(ListOfNeighbors)->
-  io:format("~p",[ListOfNeighbors]).
+gossipActor(Client, ListOfNeighbors)->
+  io:format("Client~p~n",[Client]),
+  io:format("~p~n",[ListOfNeighbors]).
 
 spawnMultipleActors(NumberOfActorsToSpawn)->
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
