@@ -1,7 +1,31 @@
 
 -module(project2).
 
--export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2]).
+-export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2,makeGrid/3]).
+makeGrid(0,0,_,_,_,Grid,_)-> %% fix hd/ tl error with empty listsssss
+  Grid;
+makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
+  if
+    Grid == [] ->
+    NewGrid = [Row];
+    true ->
+      NewGrid = lists:append(Grid,[Row])
+  end,
+  makeGrid(N-1,NumOfCol,NumOfCol,NumOfRow,List,NewGrid,[]);
+makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
+  makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)]).
+makeGrid(N,M,List)-> % assumes N*M = number of elements in List
+  makeGrid(N,M,M,N,List,[],[]).
+
+%%gridLink(N,M,Grid)-> % fix border actors to only have their actual neighbors
+%%  Row = lists:nth(N,Grid),
+%%  PID = lists:nth(M,Row),
+%%  TopRow = lists:nth(N-1,Grid),
+%%  Top3 = [lists:nth(M-1,TopRow)|lists:nth(M,TopRow)] ++ [lists:nth(M+1,TopRow)],
+%%  BottomRow = lists:nth(N+1,Grid),
+%%  Bottom3 = [lists:nth(M-1,BottomRow)|lists:nth(M,BottomRow)] ++ [lists:nth(M+1,BottomRow)],
+%%  Sides = [lists:nth(M-1,Row)|lists:nth(M+1,Row)],
+%%  PID ! Top3++Bottom3 ++ Sides.
 
 fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
   PID = lists:nth(1,List),
