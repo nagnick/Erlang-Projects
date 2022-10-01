@@ -6,20 +6,25 @@
 fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
   PID = lists:nth(1,List),
   PID ! [self()| List];
-fullLink(NumberInList,List)->
-  PID = lists:nth(NumberInList,List),
+fullLink(N,List)->
+  PID = lists:nth(N,List),
   PID ! [self() | List],
-  fullLink(NumberInList-1,List).
+  fullLink(N-1,List).
 
-linkInLine(1,List)-> % give each actor its neighbor to the right & supervisor PID, last actor get only supervisor PID
-  hd(List)! [self()],
+linkInLine(1,List)->
+  lists:nth(1,List) ! [self() | lists:nth(2,List)], % first of list
   io:format("DONE~n");
-linkInLine(NumberInList,List)->
-  PID = hd(List),
-  Rest = tl(List),
-  io:format("~p~n",[PID]),
-  PID ! [self()| hd(Rest)],
-  linkInLine(NumberInList-1,Rest).
+linkInLine(N,List)->
+  if
+    N == length(List) -> % end of list
+      PID = lists:nth(N,List),
+      PID ! [self()| lists:nth(N -1,List)];
+    true ->
+      PID = lists:nth(N,List),
+      Neighbors = [lists:nth(N -1,List)| lists:nth(N +1,List)],
+      PID ! [self()] ++ Neighbors
+  end,
+  linkInLine(N -1,List).
 
 superVisor()-> %% work in progress
   Actors = spawnMultipleActors(8),
