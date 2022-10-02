@@ -2,8 +2,8 @@
 -module(project2).
 
 -export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2,makeGrid/3]).
-makeGrid(0,0,_,_,_,Grid,_)-> %% fix hd/ tl error with empty listsssss
-  Grid;
+makeGrid(0,0,_,_,_,Grid,Row)->
+  lists:append(Grid,[Row]);
 makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
   if
     Grid == [] ->
@@ -13,7 +13,12 @@ makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
   end,
   makeGrid(N-1,NumOfCol,NumOfCol,NumOfRow,List,NewGrid,[]);
 makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
-  makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)]).
+  if
+    length(List) < 2 ->
+      makeGrid(0,M-1,NumOfCol,NumOfRow,[],Grid,Row++[hd(List)]);
+    true ->
+      makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)])
+  end.
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List
   makeGrid(N,M,M,N,List,[],[]).
 
