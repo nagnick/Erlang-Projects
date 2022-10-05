@@ -68,8 +68,18 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
 gridLink(_,_,_,0)->
   ok;
 gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
-  ActorRowNumber = (I div Columns)+1,
-  ActorColNumber = (I rem Columns)+1,
+  Temp1 = (I div Columns), %fix this indexing not proper
+  if Temp1 == 0->
+    ActorRowNumber = Rows; % 0 remapped to end
+    true ->
+      ActorRowNumber = Temp1
+      end,
+  Temp2 = (I rem Columns),
+  if Temp2 == 0 ->
+    ActorColNumber = Columns; % 0 remapped to end
+    true ->
+      ActorColNumber = Temp2
+      end,
   ActorRow = lists:nth(ActorRowNumber,Grid), % plus one no zero index
   Actor = lists:nth(ActorColNumber,ActorRow), % plus one no zero index
   TopRow = getTopNeighbors(Grid,ActorRowNumber,ActorColNumber,Columns),
@@ -86,7 +96,7 @@ gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each act
     true ->
       Right = [lists:nth(ActorColNumber+1,ActorRow)]
   end,
-  Actor ! TopRow ++ Left ++ Right ++ BottomRow,
+  Actor ! [self()] ++ TopRow ++ Left ++ Right ++ BottomRow,
   gridLink(Grid,Rows,Columns,I-1).
 
 fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
@@ -130,7 +140,7 @@ gossipActor()-> %% work in progress
   end.
 gossipActor(Client, ListOfNeighbors)->
   io:format("Client~p~n",[Client]),
-  io:format("~p~n",[ListOfNeighbors]).
+  io:format("~w~n",[ListOfNeighbors]).
 
 spawnMultipleActors(NumberOfActorsToSpawn)->
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
