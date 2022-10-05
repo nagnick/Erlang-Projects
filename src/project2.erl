@@ -1,7 +1,7 @@
 
 -module(project2).
-
--export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/4]).
+-import(rand,[uniform/1]).
+-export([gossipActor/0,superVisor/1,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/5]).
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List
   makeGrid(N,M,M,N,List,[],[]).
 
@@ -10,7 +10,7 @@ makeGrid(0,0,_,_,_,Grid,Row)->
 makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
   if
     Grid == [] ->
-    NewGrid = [Row];
+      NewGrid = [Row];
     true ->
       NewGrid = lists:append(Grid,[Row])
   end,
@@ -65,10 +65,10 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
       Right ++ [lists:nth(ActorCol,BottomRow)] ++ Left
   end.
 
-gridLink(_,_,_,0)->
+gridLink(_,_,_,0,_)->
   ok;
-gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
-  Temp1 = (I div Columns), %fix this indexing not proper
+gridLink(Grid,Rows,Columns,I,Imperfect)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
+  Temp1 = (I div Columns), %calculate actor index in 2d grid
   if Temp1 == 0->
     ActorRowNumber = Rows; % 0 remapped to end
     true ->
@@ -80,6 +80,12 @@ gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each act
     true ->
       ActorColNumber = Temp2
       end,
+  if
+    Imperfect ->
+      Random = [lists:nth(rand:uniform(Columns),lists:nth(rand:uniform(Rows),Grid))];
+    true ->
+      Random = []
+  end,
   ActorRow = lists:nth(ActorRowNumber,Grid), % plus one no zero index
   Actor = lists:nth(ActorColNumber,ActorRow), % plus one no zero index
   TopRow = getTopNeighbors(Grid,ActorRowNumber,ActorColNumber,Columns),
@@ -96,8 +102,8 @@ gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each act
     true ->
       Right = [lists:nth(ActorColNumber+1,ActorRow)]
   end,
-  Actor ! [self()] ++ TopRow ++ Left ++ Right ++ BottomRow,
-  gridLink(Grid,Rows,Columns,I-1).
+  Actor ! [self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random,
+  gridLink(Grid,Rows,Columns,I-1,Imperfect).
 
 fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
   PID = lists:nth(1,List),
@@ -122,14 +128,20 @@ linkInLine(N,List)->
   end,
   linkInLine(N -1,List).
 
-superVisor()-> %% work in progress
-  Actors = spawnMultipleActors(4),
-  messageStructure(4,Actors,'3DGrid').
+superVisor(Atom)-> %% work in progress
+  Actors = spawnMultipleActors(9),
+  messageStructure(9,Actors,Atom).
 
 messageStructure(NumberOfActors,Actors,'3DGrid')->
-  Grid = makeGrid(2,2,Actors),
+  Grid = makeGrid(3,3,Actors),
   io:format("~w",[Grid]),
-  gridLink(Grid,2,2,NumberOfActors);
+  gridLink(Grid,3,3,NumberOfActors,false);
+messageStructure(NumberOfActors,Actors,'3DGridImperfect')->
+  Grid = makeGrid(3,3,Actors),
+  io:format("~w",[Grid]),
+  gridLink(Grid,3,3,NumberOfActors,true);
+messageStructure(NumberOfActors,Actors, full)->
+  fullLink(NumberOfActors,Actors);
 messageStructure(NumberOfActors,Actors, line)->
   linkInLine(NumberOfActors,Actors).
 
