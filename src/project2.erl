@@ -1,7 +1,10 @@
 
 -module(project2).
 
--export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2,makeGrid/3]).
+-export([gossipActor/0,superVisor/0,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/4]).
+makeGrid(N,M,List)-> % assumes N*M = number of elements in List
+  makeGrid(N,M,M,N,List,[],[]).
+
 makeGrid(0,0,_,_,_,Grid,Row)->
   lists:append(Grid,[Row]);
 makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
@@ -19,18 +22,72 @@ makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
     true ->
       makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)])
   end.
-makeGrid(N,M,List)-> % assumes N*M = number of elements in List
-  makeGrid(N,M,M,N,List,[],[]).
 
-%%gridLink(N,M,Grid)-> % fix border actors to only have their actual neighbors
-%%  Row = lists:nth(N,Grid),
-%%  PID = lists:nth(M,Row),
-%%  TopRow = lists:nth(N-1,Grid),
-%%  Top3 = [lists:nth(M-1,TopRow)|lists:nth(M,TopRow)] ++ [lists:nth(M+1,TopRow)],
-%%  BottomRow = lists:nth(N+1,Grid),
-%%  Bottom3 = [lists:nth(M-1,BottomRow)|lists:nth(M,BottomRow)] ++ [lists:nth(M+1,BottomRow)],
-%%  Sides = [lists:nth(M-1,Row)|lists:nth(M+1,Row)],
-%%  PID ! Top3++Bottom3 ++ Sides.
+getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->
+  if
+    ActorRow == 1 -> % no top row
+      [];
+    true ->
+      TopRow = lists:nth(ActorRow-1,Grid),
+      if
+        ActorCol == NumCol -> % no Right actor
+          Right = [];
+        true ->
+          Right = [lists:nth(ActorCol+1,TopRow)]
+      end,
+      if
+        ActorCol == 1-> % no Left actor
+          Left = [];
+        true ->
+          Left = [lists:nth(ActorCol-1,TopRow)]
+      end,
+      Right ++ [lists:nth(ActorCol,TopRow)] ++ Left
+  end.
+
+getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
+  if
+    ActorRow == NumRow -> % no bottom row
+      [];
+    true ->
+      BottomRow = lists:nth(ActorRow+1,Grid),
+      if
+        ActorCol == NumCol -> % no Right actor
+          Right = [];
+        true ->
+          Right = [lists:nth(ActorCol+1,BottomRow)]
+      end,
+      if
+        ActorCol == 1-> % no Left actor
+          Left = [];
+        true ->
+          Left = [lists:nth(ActorCol-1,BottomRow)]
+      end,
+      Right ++ [lists:nth(ActorCol,BottomRow)] ++ Left
+  end.
+
+gridLink(_,_,_,0)->
+  ok;
+gridLink(Grid,Rows,Columns,I)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
+  ActorRowNumber = (I div Columns)+1,
+  ActorColNumber = (I rem Columns)+1,
+  ActorRow = lists:nth(ActorRowNumber,Grid), % plus one no zero index
+  Actor = lists:nth(ActorColNumber,ActorRow), % plus one no zero index
+  TopRow = getTopNeighbors(Grid,ActorRowNumber,ActorColNumber,Columns),
+  BottomRow = getBottomNeighbors(Grid,ActorRowNumber,ActorColNumber,Rows,Columns),
+  if
+    ActorColNumber == 1 -> % no left
+      Left = [];
+    true ->
+      Left = [lists:nth(ActorColNumber -1,ActorRow)]
+  end,
+  if
+    ActorColNumber == Columns -> % no right
+      Right = [];
+    true ->
+      Right = [lists:nth(ActorColNumber+1,ActorRow)]
+  end,
+  Actor ! TopRow ++ Left ++ Right ++ BottomRow,
+  gridLink(Grid,Rows,Columns,I-1).
 
 fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
   PID = lists:nth(1,List),
@@ -56,9 +113,13 @@ linkInLine(N,List)->
   linkInLine(N -1,List).
 
 superVisor()-> %% work in progress
-  Actors = spawnMultipleActors(8),
-  messageStructure(8,Actors,line).
+  Actors = spawnMultipleActors(4),
+  messageStructure(4,Actors,'3DGrid').
 
+messageStructure(NumberOfActors,Actors,'3DGrid')->
+  Grid = makeGrid(2,2,Actors),
+  io:format("~w",[Grid]),
+  gridLink(Grid,2,2,NumberOfActors);
 messageStructure(NumberOfActors,Actors, line)->
   linkInLine(NumberOfActors,Actors).
 
