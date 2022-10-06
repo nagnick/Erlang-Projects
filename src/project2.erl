@@ -1,13 +1,13 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([gossipActor/0,superVisor/2,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/5]).
-makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list
+-export([actor/0,superVisor/3]).
+makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
   makeGrid(N,M,M,N,List,[],[]).
 
-makeGrid(0,0,_,_,_,Grid,Row)->
+makeGrid(0,0,_,_,_,Grid,Row)->%DONE
   lists:append(Grid,[Row]);
-makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
+makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
   if
     Grid == [] ->
       NewGrid = [Row];
@@ -15,7 +15,7 @@ makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
       NewGrid = lists:append(Grid,[Row])
   end,
   makeGrid(N-1,NumOfCol,NumOfCol,NumOfRow,List,NewGrid,[]);
-makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
+makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
   if
     length(List) < 2 ->
       makeGrid(0,M-1,NumOfCol,NumOfRow,[],Grid,Row++[hd(List)]);
@@ -23,7 +23,7 @@ makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
       makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)])
   end.
 
-getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->
+getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->%DONE
   if
     ActorRow == 1 -> % no top row
       [];
@@ -44,7 +44,7 @@ getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->
       Right ++ [lists:nth(ActorCol,TopRow)] ++ Left
   end.
 
-getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
+getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->%DONE
   if
     ActorRow == NumRow -> % no bottom row
       [];
@@ -65,9 +65,9 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
       Right ++ [lists:nth(ActorCol,BottomRow)] ++ Left
   end.
 
-gridLink(_,_,_,0,_)->
+gridLink(_,_,_,0,_,_)->%work in progress
   ok;
-gridLink(Grid,Rows,Columns,I,Imperfect)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
+gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%work in progress
   Temp1 = (I div Columns), %calculate actor index in 2d grid
   if Temp1 == 0->
     ActorRowNumber = Rows; % 0 remapped to end
@@ -102,21 +102,21 @@ gridLink(Grid,Rows,Columns,I,Imperfect)-> % creates a list of neighbor actors fo
     true ->
       Right = [lists:nth(ActorColNumber+1,ActorRow)]
   end,
-  Actor ! [self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random,
-  gridLink(Grid,Rows,Columns,I-1,Imperfect).
+  Actor ! [Gossip| self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random, %list[algotype,algoinfo,supervisorPID,NeighborPIDs]
+  gridLink(Grid,Rows,Columns,I-1,Imperfect,Gossip).
 
-fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID
+fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID%work in progress
   PID = lists:nth(1,List),
   PID ! [self()| List];
-fullLink(N,List)->
+fullLink(N,List)->%work in progress
   PID = lists:nth(N,List),
   PID ! [self() | List],
   fullLink(N-1,List).
 
-linkInLine(1,List)->
+linkInLine(1,List)->%work in progress
   lists:nth(1,List) ! [self() | lists:nth(2,List)], % first of list
   io:format("DONE~n");
-linkInLine(N,List)->
+linkInLine(N,List)->%work in progress
   if
     N == length(List) -> % end of list
       PID = lists:nth(N,List),
@@ -128,34 +128,66 @@ linkInLine(N,List)->
   end,
   linkInLine(N -1,List).
 
-superVisor(NumberOfNodes, Atom)-> %% work in progress add algo arg
-  messageStructure(NumberOfNodes,Atom).
-
-messageStructure(NumberOfActors,'2D')->
+superVisor(NumberOfActors,'2D', Algo)-> %work in progress
   %round up to get a square like doc says though square not required by functions below
+  if
+    Algo == gossip ->
+      Gossip = true;
+    true ->
+      Gossip = false
+  end,
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,3,3,NumberOfActors,false);
-messageStructure(NumberOfActors,'imp2D')->
+  gridLink(Grid,3,3,NumberOfActors,false,Gossip);
+superVisor(NumberOfActors,'imp2D', Algo)->%work in progress
   %round up to get a square like doc says though square not required by functions below
+  if
+    Algo == gossip ->
+      Gossip = true;
+    true ->
+      Gossip = false
+  end,
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,3,3,NumberOfActors,true);
-messageStructure(NumberOfActors, full)->
+  gridLink(Grid,3,3,NumberOfActors,true,Gossip);
+superVisor(NumberOfActors, full, Algo)->%work in progress
+  if
+    Algo == gossip ->
+      Gossip = true;
+    true ->
+      Gossip = false
+  end,
   Actors = spawnMultipleActors(NumberOfActors),
   fullLink(NumberOfActors,Actors);
-messageStructure(NumberOfActors, line)->
+superVisor(NumberOfActors, line, Algo)->%work in progress
+  if
+    Algo == gossip ->
+      Gossip = true;
+    true ->
+      Gossip = false
+  end,
   Actors = spawnMultipleActors(NumberOfActors),
   linkInLine(NumberOfActors,Actors).
 
-gossipActor()-> %% work in progress
+actor()-> %% work in progress
   receive
-    ListOfNeighbors->
-      gossipActor(hd(ListOfNeighbors),tl(ListOfNeighbors))
-  end.
-gossipActor(Client, ListOfNeighbors)->
+    List->
+      Gossip = hd(List),
+      PIDs = tl(List),
+      if
+      Gossip == true ->
+        gossipActor(hd(PIDs),tl(PIDs));
+      true ->
+        pushSumActor(hd(PIDs),tl(PIDs))
+      end
+end.
+
+gossipActor(Client, ListOfNeighbors)->%work in progress
+  io:format("Client~p~n",[Client]),
+  io:format("~w~n",[ListOfNeighbors]).
+pushSumActor(Client,ListOfNeighbors)->%work in progress
   io:format("Client~p~n",[Client]),
   io:format("~w~n",[ListOfNeighbors]).
 
@@ -165,4 +197,4 @@ spawnMultipleActors(0,ListOfPid)->
   io:format("~p~n",[ListOfPid]),
   ListOfPid;
 spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid)->
-  spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,gossipActor,[]) | ListOfPid]).
+  spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[]) | ListOfPid]).
