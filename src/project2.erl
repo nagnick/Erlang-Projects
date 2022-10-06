@@ -65,9 +65,9 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->%DONE
       Right ++ [lists:nth(ActorCol,BottomRow)] ++ Left
   end.
 
-gridLink(_,_,_,0,_,_)->%work in progress
+gridLink(_,_,_,0,_,_)->%DONE
   ok;
-gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%work in progress
+gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%DONE
   Temp1 = (I div Columns), %calculate actor index in 2d grid
   if Temp1 == 0->
     ActorRowNumber = Rows; % 0 remapped to end
@@ -102,33 +102,63 @@ gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor ac
     true ->
       Right = [lists:nth(ActorColNumber+1,ActorRow)]
   end,
-  Actor ! [Gossip| self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random, %list[algotype,algoinfo,supervisorPID,NeighborPIDs]
+  if
+    Gossip == true->
+      Actor ! [Gossip| self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random; %list[algotype,supervisorPID,NeighborPIDs];
+    true -> % push sum give algo info as well which is actor number I
+      Actor ! [Gossip| I] ++ [self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+  end,
   gridLink(Grid,Rows,Columns,I-1,Imperfect,Gossip).
 
-fullLink(1,List)-> %give every actor a list of all actors first element is the supervisor PID%work in progress
-  PID = lists:nth(1,List),
-  PID ! [self()| List];
-fullLink(N,List)->%work in progress
-  PID = lists:nth(N,List),
-  PID ! [self() | List],
-  fullLink(N-1,List).
-
-linkInLine(1,List)->%work in progress
-  lists:nth(1,List) ! [self() | lists:nth(2,List)], % first of list
-  io:format("DONE~n");
-linkInLine(N,List)->%work in progress
+fullLink(1,List,Gossip)-> %give every actor a list of all actors first element is the supervisor PID%DONE
+  Actor = lists:nth(1,List),
   if
-    N == length(List) -> % end of list
-      PID = lists:nth(N,List),
-      PID ! [self()| lists:nth(N -1,List)];
-    true ->
-      PID = lists:nth(N,List),
-      Neighbors = [lists:nth(N -1,List)| lists:nth(N +1,List)],
-      PID ! [self()] ++ Neighbors
+    Gossip == true->
+      Actor ! [Gossip| self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+    true -> % push sum give algo info as well which is actor number I
+      Actor ! [Gossip| 1] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+  end;
+fullLink(I,List,Gossip)->%DONE
+  Actor = lists:nth(I,List),
+  if
+    Gossip == true->
+      Actor ! [Gossip| self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+    true -> % push sum give algo info as well which is actor number I
+      Actor ! [Gossip| I] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
-  linkInLine(N -1,List).
+  fullLink(I-1,List).
 
-superVisor(NumberOfActors,'2D', Algo)-> %work in progress
+linkInLine(1,List,Gossip)->%DONE
+  Actor = lists:nth(1,List), % send second item in list to first item in list
+  if
+    Gossip == true->
+      Actor ! [Gossip| self()] ++ [lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+    true -> % push sum give algo info as well which is actor number I
+      Actor ! [Gossip| 1] ++ [self()| lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+  end;
+linkInLine(I,List,Gossip)->%DONE
+  if
+    I == length(List) -> % end of list give second to last pid
+      Actor = lists:nth(I,List),
+      if
+        Gossip == true->
+          Actor ! [Gossip| self()] ++ [lists:nth(I -1,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+        true -> % push sum give algo info as well which is actor number I
+          Actor ! [Gossip| I] ++ [self()| lists:nth(I -1,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      end;
+    true ->
+      Actor = lists:nth(I,List),
+      Neighbors = [lists:nth(I -1,List)| lists:nth(I +1,List)],
+      if
+        Gossip == true->
+          Actor ! [Gossip| self()] ++ Neighbors; %list[algotype,supervisorPID,NeighborPIDs];
+        true -> % push sum give algo info as well which is actor number I
+          Actor ! [Gossip| I] ++ [self()| Neighbors]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      end
+  end,
+  linkInLine(I -1,List).
+
+superVisor(NumberOfActors,'2D', Algo)-> %DONE
   %round up to get a square like doc says though square not required by functions below
   if
     Algo == gossip ->
@@ -140,7 +170,7 @@ superVisor(NumberOfActors,'2D', Algo)-> %work in progress
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
   gridLink(Grid,3,3,NumberOfActors,false,Gossip);
-superVisor(NumberOfActors,'imp2D', Algo)->%work in progress
+superVisor(NumberOfActors,'imp2D', Algo)->%DONE
   %round up to get a square like doc says though square not required by functions below
   if
     Algo == gossip ->
@@ -151,8 +181,8 @@ superVisor(NumberOfActors,'imp2D', Algo)->%work in progress
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,3,3,NumberOfActors,true,Gossip);
-superVisor(NumberOfActors, full, Algo)->%work in progress
+  gridLink(Grid,3,3,NumberOfActors,true,Gossip);% true to add random actor to neighbor list
+superVisor(NumberOfActors, full, Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
@@ -160,8 +190,8 @@ superVisor(NumberOfActors, full, Algo)->%work in progress
       Gossip = false
   end,
   Actors = spawnMultipleActors(NumberOfActors),
-  fullLink(NumberOfActors,Actors);
-superVisor(NumberOfActors, line, Algo)->%work in progress
+  fullLink(NumberOfActors,Actors,Gossip);
+superVisor(NumberOfActors, line, Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
@@ -169,26 +199,30 @@ superVisor(NumberOfActors, line, Algo)->%work in progress
       Gossip = false
   end,
   Actors = spawnMultipleActors(NumberOfActors),
-  linkInLine(NumberOfActors,Actors).
+  linkInLine(NumberOfActors,Actors,Gossip).
 
 actor()-> %% work in progress
   receive
     List->
       Gossip = hd(List),
-      PIDs = tl(List),
       if
       Gossip == true ->
+        PIDs = tl(List),
         gossipActor(hd(PIDs),tl(PIDs));
-      true ->
-        pushSumActor(hd(PIDs),tl(PIDs))
+      true -> % pushsum
+        Tail = tl(List),
+        ActorNum = hd(Tail),
+        PIDs = tl(Tail),
+        pushSumActor(hd(PIDs),ActorNum,tl(PIDs))
       end
 end.
 
 gossipActor(Client, ListOfNeighbors)->%work in progress
   io:format("Client~p~n",[Client]),
   io:format("~w~n",[ListOfNeighbors]).
-pushSumActor(Client,ListOfNeighbors)->%work in progress
+pushSumActor(Client,ActorNum, ListOfNeighbors)->%work in progress
   io:format("Client~p~n",[Client]),
+  io:format("ActorNum~p~n",[ActorNum]),
   io:format("~w~n",[ListOfNeighbors]).
 
 spawnMultipleActors(NumberOfActorsToSpawn)->
