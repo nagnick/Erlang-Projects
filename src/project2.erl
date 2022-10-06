@@ -104,9 +104,9 @@ gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor ac
   end,
   if
     Gossip == true->
-      Actor ! [Gossip| self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip| I] ++ [self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, I, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   gridLink(Grid,Rows,Columns,I-1,Imperfect,Gossip).
 
@@ -114,27 +114,27 @@ fullLink(1,List,Gossip)-> %give every actor a list of all actors first element i
   Actor = lists:nth(1,List),
   if
     Gossip == true->
-      Actor ! [Gossip| self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip| 1] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, 1] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end;
 fullLink(I,List,Gossip)->%DONE
   Actor = lists:nth(I,List),
   if
     Gossip == true->
-      Actor ! [Gossip| self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip| I] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, I] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
-  fullLink(I-1,List).
+  fullLink(I-1,List,Gossip).
 
 linkInLine(1,List,Gossip)->%DONE
   Actor = lists:nth(1,List), % send second item in list to first item in list
   if
     Gossip == true->
-      Actor ! [Gossip| self()] ++ [lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self(),lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip| 1] ++ [self()| lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, 1] ++ [self()| lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end;
 linkInLine(I,List,Gossip)->%DONE
   if
@@ -142,21 +142,21 @@ linkInLine(I,List,Gossip)->%DONE
       Actor = lists:nth(I,List),
       if
         Gossip == true->
-          Actor ! [Gossip| self()] ++ [lists:nth(I -1,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+          Actor ! [Gossip, self(),lists:nth(I -1,List)]; %list[algotype,supervisorPID,NeighborPIDs];
         true -> % push sum give algo info as well which is actor number I
-          Actor ! [Gossip| I] ++ [self()| lists:nth(I -1,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+          Actor ! [Gossip, I] ++ [self()| lists:nth(I -1,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
       end;
     true ->
       Actor = lists:nth(I,List),
-      Neighbors = [lists:nth(I -1,List)| lists:nth(I +1,List)],
+      Neighbors = [lists:nth(I -1,List), lists:nth(I +1,List)],
       if
         Gossip == true->
-          Actor ! [Gossip| self()] ++ Neighbors; %list[algotype,supervisorPID,NeighborPIDs];
+          Actor ! [Gossip, self()] ++ Neighbors; %list[algotype,supervisorPID,NeighborPIDs];
         true -> % push sum give algo info as well which is actor number I
-          Actor ! [Gossip| I] ++ [self()| Neighbors]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+          Actor ! [Gossip, I] ++ [self()| Neighbors]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
       end
   end,
-  linkInLine(I -1,List).
+  linkInLine(I -1,List,Gossip).
 
 superVisor(NumberOfActors,'2D', Algo)-> %DONE
   %round up to get a square like doc says though square not required by functions below
