@@ -1,8 +1,8 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([gossipActor/0,superVisor/1,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/5]).
-makeGrid(N,M,List)-> % assumes N*M = number of elements in List
+-export([gossipActor/0,superVisor/2,spawnMultipleActors/1, fullLink/2,makeGrid/3, gridLink/5]).
+makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list
   makeGrid(N,M,M,N,List,[],[]).
 
 makeGrid(0,0,_,_,_,Grid,Row)->
@@ -128,21 +128,26 @@ linkInLine(N,List)->
   end,
   linkInLine(N -1,List).
 
-superVisor(Atom)-> %% work in progress
-  Actors = spawnMultipleActors(9),
-  messageStructure(9,Actors,Atom).
+superVisor(NumberOfNodes, Atom)-> %% work in progress add algo arg
+  messageStructure(NumberOfNodes,Atom).
 
-messageStructure(NumberOfActors,Actors,'3DGrid')->
-  Grid = makeGrid(3,3,Actors),
-  io:format("~w",[Grid]),
+messageStructure(NumberOfActors,'2D')->
+  %round up to get a square like doc says though square not required by functions below
+  W = round(math:ceil(math:sqrt(NumberOfActors))),
+  Actors = spawnMultipleActors(W*W),
+  Grid = makeGrid(W,W,Actors),
   gridLink(Grid,3,3,NumberOfActors,false);
-messageStructure(NumberOfActors,Actors,'3DGridImperfect')->
-  Grid = makeGrid(3,3,Actors),
-  io:format("~w",[Grid]),
+messageStructure(NumberOfActors,'imp2D')->
+  %round up to get a square like doc says though square not required by functions below
+  W = round(math:ceil(math:sqrt(NumberOfActors))),
+  Actors = spawnMultipleActors(W*W),
+  Grid = makeGrid(W,W,Actors),
   gridLink(Grid,3,3,NumberOfActors,true);
-messageStructure(NumberOfActors,Actors, full)->
+messageStructure(NumberOfActors, full)->
+  Actors = spawnMultipleActors(NumberOfActors),
   fullLink(NumberOfActors,Actors);
-messageStructure(NumberOfActors,Actors, line)->
+messageStructure(NumberOfActors, line)->
+  Actors = spawnMultipleActors(NumberOfActors),
   linkInLine(NumberOfActors,Actors).
 
 gossipActor()-> %% work in progress
