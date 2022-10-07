@@ -162,8 +162,7 @@ linkInLine(I,List,Gossip)->%DONE
   end,
   linkInLine(I -1,List,Gossip).
 
-superVisor(NumberOfActors,'2D', Algo)-> %DONE
-  %round up to get a square like doc says though square not required by functions below
+superVisor(NumberOfActors, Topology, Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
@@ -173,77 +172,59 @@ superVisor(NumberOfActors,'2D', Algo)-> %DONE
       Gossip = true,% just for compiler warning doesnt get used
       throw("Not a valid Algo enter gossip or pushSum")
   end,
-  W = round(math:ceil(math:sqrt(NumberOfActors))),
-  Actors = spawnMultipleActors(W*W),
-  Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,W,W,W*W,false,Gossip),
-  if %start algos
-  Gossip == true->
-    lists:nth(rand:uniform(W*W),Actors) ! "rumor";
-  true ->
-    lists:nth(rand:uniform(W*W),Actors) ! start
-  end,
-  ok;
-superVisor(NumberOfActors,'imp2D', Algo)->%DONE
-  %round up to get a square like doc says though square not required by functions below
-  if
-    Algo == gossip ->
-      Gossip = true;
-    Algo == pushSum ->
-      Gossip = false;
+  if % start topology building
+    Topology == line->
+      ActualNumOfActors = NumberOfActors,
+      Actors = spawnMultipleActors(NumberOfActors),
+      linkInLine(NumberOfActors,Actors,Gossip);
+    Topology == full->
+      ActualNumOfActors = NumberOfActors,
+      Actors = spawnMultipleActors(NumberOfActors),
+      fullLink(NumberOfActors,Actors,Gossip);
+    Topology == imp2D->
+      W = round(math:ceil(math:sqrt(NumberOfActors))),
+      ActualNumOfActors = W*W,
+      Actors = spawnMultipleActors(ActualNumOfActors),
+      Grid = makeGrid(W,W,Actors),
+      gridLink(Grid,W,W,ActualNumOfActors,true,Gossip);% true to add random actor to neighbor list
+    Topology == '2D' ->
+      W = round(math:ceil(math:sqrt(NumberOfActors))),
+      ActualNumOfActors = W*W,
+      Actors = spawnMultipleActors(ActualNumOfActors),
+      Grid = makeGrid(W,W,Actors),
+      gridLink(Grid,W,W,ActualNumOfActors,false,Gossip);
     true ->
-      Gossip = true,% just for compiler warning doesnt get used
-      throw("Not a valid Algo enter gossip or pushSum")
+      ActualNumOfActors = NumberOfActors, % just for compiler safety
+      Actors = [],% just for compiler safety
+      throw("Not a valid Topology. Valid options: [line,full,'2D',imp2D")
   end,
-  W = round(math:ceil(math:sqrt(NumberOfActors))),
-  Actors = spawnMultipleActors(W*W),
-  Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,W,W,W*W,true,Gossip),% true to add random actor to neighbor list
-  if %start algos
-    Gossip == true->
-      lists:nth(rand:uniform(W*W),Actors) ! "rumor";
-    true ->
-      lists:nth(rand:uniform(W*W),Actors) ! start
-  end,
-  ok;
-superVisor(NumberOfActors, full, Algo)->%DONE
-  if
-    Algo == gossip ->
-      Gossip = true;
-    Algo == pushSum ->
-      Gossip = false;
-    true ->
-      Gossip = true,% just for compiler warning doesnt get used
-      throw("Not a valid Algo enter gossip or pushSum")
-  end,
-  Actors = spawnMultipleActors(NumberOfActors),
-  fullLink(NumberOfActors,Actors,Gossip),
   if %start algos
     Gossip == true->
-      lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
+      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! "rumor", % tell random actor rumor to start process
+      gossipConvergenceCheck(Actors,erlang:monotonic_time()),
+      actorKiller(Actors);
     true ->
-      lists:nth(rand:uniform(NumberOfActors),Actors) ! start
-  end,
-  ok;
-superVisor(NumberOfActors, line, Algo)->%DONE
-  if
-    Algo == gossip ->
-      Gossip = true;
-    Algo == pushSum ->
-      Gossip = false;
-    true ->
-      Gossip = true,% just for compiler warning doesnt get used
-      throw("Not a valid Algo enter gossip or pushSum")
-  end,
-  Actors = spawnMultipleActors(NumberOfActors),
-  linkInLine(NumberOfActors,Actors,Gossip),
-  if %start algos
-    Gossip == true->
-      lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
-    true ->
-      lists:nth(rand:uniform(NumberOfActors),Actors) ! start
+      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! start
   end,
   ok.
+
+gossipConvergenceCheck([],StartTime)->
+  EndTime = erlang:monotonic_time(),%recommend replacement to now()
+  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
+  io:format("REAL TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  ok;
+gossipConvergenceCheck(ListOfActors,StartTime)->
+  receive
+    {done,ActorPID} ->
+      PIDs = ListOfActors -- [ActorPID],
+      gossipConvergenceCheck(PIDs,StartTime)
+  end.
+
+actorKiller([])-> %Tell actors to kill themselves the swarm has converged
+  ok;
+actorKiller(ListOfActors)->
+  hd(ListOfActors) ! die,
+  actorKiller(tl(ListOfActors)).
 
 actor()-> %% work in progress
   receive
@@ -264,16 +245,25 @@ end.
 gossipActor(Client, ListOfNeighbors)->%DONE
   io:format("Client~p~n",[Client]),
   io:format("~w~n",[ListOfNeighbors]),
-  gossipActor(Client,ListOfNeighbors,10).% stop after sharing rumor 10 times
+  gossipActor(Client,ListOfNeighbors,10,false).% stop after sharing rumor 10 times
 
-gossipActor(_,_,0)->
+gossipActor(_,_,0,_)->
   ok;
-gossipActor(Client,ListOfNeighbors,N)->
+gossipActor(Client,ListOfNeighbors,N,true)->
   receive
     Rumor ->
       lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor
   end,
-  gossipActor(Client,ListOfNeighbors,N-1).
+  gossipActor(Client,ListOfNeighbors,N-1,true);
+gossipActor(Client,ListOfNeighbors,N,false)->
+  receive
+    Rumor ->
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
+      % tell supervisor I have heard rumor only do once
+      Client ! {done, self()},
+      io:format("Got rumor ~p~n",[self()])
+  end,
+  gossipActor(Client,ListOfNeighbors,N-1,true). % Done = true as has to have heard rumor to have gotten here
 
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
   io:format("Client~p~n",[Client]),
