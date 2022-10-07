@@ -167,8 +167,11 @@ superVisor(NumberOfActors,'2D', Algo)-> %DONE
   if
     Algo == gossip ->
       Gossip = true;
+    Algo == pushSum ->
+      Gossip = false;
     true ->
-      Gossip = false
+      Gossip = true,% just for compiler warning doesnt get used
+      throw("Not a valid Algo enter gossip or pushSum")
   end,
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
@@ -186,8 +189,11 @@ superVisor(NumberOfActors,'imp2D', Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
+    Algo == pushSum ->
+      Gossip = false;
     true ->
-      Gossip = false
+      Gossip = true,% just for compiler warning doesnt get used
+      throw("Not a valid Algo enter gossip or pushSum")
   end,
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
@@ -204,8 +210,11 @@ superVisor(NumberOfActors, full, Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
+    Algo == pushSum ->
+      Gossip = false;
     true ->
-      Gossip = false
+      Gossip = true,% just for compiler warning doesnt get used
+      throw("Not a valid Algo enter gossip or pushSum")
   end,
   Actors = spawnMultipleActors(NumberOfActors),
   fullLink(NumberOfActors,Actors,Gossip),
@@ -220,8 +229,11 @@ superVisor(NumberOfActors, line, Algo)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
+    Algo == pushSum ->
+      Gossip = false;
     true ->
-      Gossip = false
+      Gossip = true,% just for compiler warning doesnt get used
+      throw("Not a valid Algo enter gossip or pushSum")
   end,
   Actors = spawnMultipleActors(NumberOfActors),
   linkInLine(NumberOfActors,Actors,Gossip),
