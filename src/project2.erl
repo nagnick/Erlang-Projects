@@ -177,7 +177,8 @@ superVisor(NumberOfActors,'2D', Algo)-> %DONE
     lists:nth(rand:uniform(W*W),Actors) ! "rumor";
   true ->
     lists:nth(rand:uniform(W*W),Actors) ! start
-  end;
+  end,
+  ok;
 superVisor(NumberOfActors,'imp2D', Algo)->%DONE
   %round up to get a square like doc says though square not required by functions below
   if
@@ -195,7 +196,8 @@ superVisor(NumberOfActors,'imp2D', Algo)->%DONE
       lists:nth(rand:uniform(W*W),Actors) ! "rumor";
     true ->
       lists:nth(rand:uniform(W*W),Actors) ! start
-  end;
+  end,
+  ok;
 superVisor(NumberOfActors, full, Algo)->%DONE
   if
     Algo == gossip ->
@@ -210,7 +212,8 @@ superVisor(NumberOfActors, full, Algo)->%DONE
       lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
     true ->
       lists:nth(rand:uniform(NumberOfActors),Actors) ! start
-  end;
+  end,
+  ok;
 superVisor(NumberOfActors, line, Algo)->%DONE
   if
     Algo == gossip ->
@@ -225,7 +228,8 @@ superVisor(NumberOfActors, line, Algo)->%DONE
       lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
     true ->
       lists:nth(rand:uniform(NumberOfActors),Actors) ! start
-  end.
+  end,
+  ok.
 
 actor()-> %% work in progress
   receive
@@ -243,15 +247,26 @@ actor()-> %% work in progress
       end
 end.
 
-gossipActor(Client, ListOfNeighbors)->%work in progress
-  io:format("Client~p~n",[Client]),
-  io:format("~w~n",[ListOfNeighbors]).
+gossipActor(Client, ListOfNeighbors)->%DONE
+  %io:format("Client~p~n",[Client]),
+  %io:format("~w~n",[ListOfNeighbors]),
+  gossipActor(Client,ListOfNeighbors,10).% stop after sharing rumor 10 times
+
+gossipActor(_,_,0)->
+  ok;
+gossipActor(Client,ListOfNeighbors,N)->
+  receive
+    Rumor ->
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor
+  end,
+  gossipActor(Client,ListOfNeighbors,N-1).
+
 pushSumActor(Client,ActorNum, ListOfNeighbors)->%work in progress
   io:format("Client~p~n",[Client]),
   io:format("ActorNum~p~n",[ActorNum]),
   io:format("~w~n",[ListOfNeighbors]).
 
-spawnMultipleActors(NumberOfActorsToSpawn)->
+spawnMultipleActors(NumberOfActorsToSpawn)->%DONE
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
 spawnMultipleActors(0,ListOfPid)->
   io:format("~p~n",[ListOfPid]),
