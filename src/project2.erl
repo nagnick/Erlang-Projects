@@ -261,10 +261,32 @@ gossipActor(Client,ListOfNeighbors,N)->
   end,
   gossipActor(Client,ListOfNeighbors,N-1).
 
-pushSumActor(Client,ActorNum, ListOfNeighbors)->%work in progress
+pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
   io:format("Client~p~n",[Client]),
-  io:format("ActorNum~p~n",[ActorNum]),
-  io:format("~w~n",[ListOfNeighbors]).
+  io:format("ActorNum~p~n",[S]),
+  io:format("~w~n",[ListOfNeighbors]),
+  pushSumActor(Client,S,1,ListOfNeighbors,3,S,math:pow(10,-10)).% 1 = w ; 3 is max number of rounds without change in ratio(last arg S)
+
+pushSumActor(_,_,_,_,_,0,_)->
+  ok;
+pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
+  receive
+    {MS,MW}->
+      SS = MS+S,
+      SW = MW +W,
+      CurrentRatio = (SS/SW),
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {SS/2,SW/2}, % send half
+      if
+        abs(CurrentRatio - LastRatio)  > L ->
+          pushSumActor(Client,SS/2,SW/2,ListOfNeighbors,3,CurrentRatio,L); % keep half
+        true -> % ratio did not change by at min L so down a round
+          pushSumActor(Client,SS/2,SW/2,ListOfNeighbors,Round-1,CurrentRatio,L)
+      end;
+    start -> % sent by supervisor to start pushsum
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,W/2},
+      pushSumActor(Client,S/2,W/2,ListOfNeighbors,3,LastRatio,L)
+  end,
+  ok.
 
 spawnMultipleActors(NumberOfActorsToSpawn)->%DONE
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
