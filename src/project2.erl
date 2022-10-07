@@ -117,7 +117,8 @@ fullLink(1,List,Gossip)-> %give every actor a list of all actors first element i
       Actor ! [Gossip, self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
       Actor ! [Gossip, 1] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
-  end;
+  end,
+  ok;
 fullLink(I,List,Gossip)->%DONE
   Actor = lists:nth(I,List),
   if
@@ -135,7 +136,8 @@ linkInLine(1,List,Gossip)->%DONE
       Actor ! [Gossip, self(),lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
       Actor ! [Gossip, 1] ++ [self()| lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
-  end;
+  end,
+  ok;
 linkInLine(I,List,Gossip)->%DONE
   if
     I == length(List) -> % end of list give second to last pid
@@ -169,7 +171,13 @@ superVisor(NumberOfActors,'2D', Algo)-> %DONE
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,3,3,NumberOfActors,false,Gossip);
+  gridLink(Grid,W,W,W*W,false,Gossip),
+  if %start algos
+  Gossip == true->
+    lists:nth(rand:uniform(W*W),Actors) ! "rumor";
+  true ->
+    lists:nth(rand:uniform(W*W),Actors) ! start
+  end;
 superVisor(NumberOfActors,'imp2D', Algo)->%DONE
   %round up to get a square like doc says though square not required by functions below
   if
@@ -181,7 +189,13 @@ superVisor(NumberOfActors,'imp2D', Algo)->%DONE
   W = round(math:ceil(math:sqrt(NumberOfActors))),
   Actors = spawnMultipleActors(W*W),
   Grid = makeGrid(W,W,Actors),
-  gridLink(Grid,3,3,NumberOfActors,true,Gossip);% true to add random actor to neighbor list
+  gridLink(Grid,W,W,W*W,true,Gossip),% true to add random actor to neighbor list
+  if %start algos
+    Gossip == true->
+      lists:nth(rand:uniform(W*W),Actors) ! "rumor";
+    true ->
+      lists:nth(rand:uniform(W*W),Actors) ! start
+  end;
 superVisor(NumberOfActors, full, Algo)->%DONE
   if
     Algo == gossip ->
@@ -190,7 +204,13 @@ superVisor(NumberOfActors, full, Algo)->%DONE
       Gossip = false
   end,
   Actors = spawnMultipleActors(NumberOfActors),
-  fullLink(NumberOfActors,Actors,Gossip);
+  fullLink(NumberOfActors,Actors,Gossip),
+  if %start algos
+    Gossip == true->
+      lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
+    true ->
+      lists:nth(rand:uniform(NumberOfActors),Actors) ! start
+  end;
 superVisor(NumberOfActors, line, Algo)->%DONE
   if
     Algo == gossip ->
@@ -199,7 +219,13 @@ superVisor(NumberOfActors, line, Algo)->%DONE
       Gossip = false
   end,
   Actors = spawnMultipleActors(NumberOfActors),
-  linkInLine(NumberOfActors,Actors,Gossip).
+  linkInLine(NumberOfActors,Actors,Gossip),
+  if %start algos
+    Gossip == true->
+      lists:nth(rand:uniform(NumberOfActors),Actors) ! "rumor";
+    true ->
+      lists:nth(rand:uniform(NumberOfActors),Actors) ! start
+  end.
 
 actor()-> %% work in progress
   receive
