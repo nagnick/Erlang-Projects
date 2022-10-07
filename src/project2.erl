@@ -112,20 +112,22 @@ gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor ac
 
 fullLink(1,List,Gossip)-> %give every actor a list of all actors first element is the supervisor PID%DONE
   Actor = lists:nth(1,List),
+  PIDS = List -- [Actor],% remove itself from neighbors
   if
     Gossip == true->
-      Actor ! [Gossip, self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self()] ++ PIDS; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, 1] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, 1] ++ [self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   ok;
 fullLink(I,List,Gossip)->%DONE
   Actor = lists:nth(I,List),
+  PIDS = List -- [Actor], % remove itself from neighbors
   if
     Gossip == true->
-      Actor ! [Gossip, self()] ++ List; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self()] ++ PIDS; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, I] ++ [self()| List]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, I] ++ [self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   fullLink(I-1,List,Gossip).
 
@@ -248,8 +250,8 @@ actor()-> %% work in progress
 end.
 
 gossipActor(Client, ListOfNeighbors)->%DONE
-  %io:format("Client~p~n",[Client]),
-  %io:format("~w~n",[ListOfNeighbors]),
+  io:format("Client~p~n",[Client]),
+  io:format("~w~n",[ListOfNeighbors]),
   gossipActor(Client,ListOfNeighbors,10).% stop after sharing rumor 10 times
 
 gossipActor(_,_,0)->
