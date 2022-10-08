@@ -213,7 +213,7 @@ superVisor(NumberOfActors, Topology, Algo)->%DONE
 gossipConvergenceCheck([],StartTime)->
   EndTime = erlang:monotonic_time(),%recommend replacement to now()
   REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
-  io:format("REAL TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  io:format("CONVERGENCE TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
   ok;
 gossipConvergenceCheck(ListOfActors,StartTime)->
   receive
@@ -225,7 +225,7 @@ gossipConvergenceCheck(ListOfActors,StartTime)->
 pushSumConvergenceCheck([],StartTime)->
   EndTime = erlang:monotonic_time(),%recommend replacement to now()
   REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
-  io:format("REAL TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  io:format("CONVERGENCE TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
   ok;
 pushSumConvergenceCheck(_,StartTime)->
   receive
@@ -257,8 +257,6 @@ actor()-> %% work in progress
 end.
 
 gossipActor(Client, ListOfNeighbors)->%DONE
-%%  io:format("Client~p~n",[Client]),
-%%  io:format("~w~n",[ListOfNeighbors]),
   gossipActor(Client,ListOfNeighbors,10,false).% stop after sharing rumor 10 times
 
 gossipActor(_,_,0,_)->
@@ -280,9 +278,6 @@ gossipActor(Client,ListOfNeighbors,N,false)->
   gossipActor(Client,ListOfNeighbors,N-1,true). % Done = true as has to have heard rumor to have gotten here
 
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
-%%  io:format("Client~p~n",[Client]),
-%%  io:format("ActorNum~p~n",[S]),
-%%  io:format("~w~n",[ListOfNeighbors]),
   pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
 
 pushSumActor(Client,S,W,_,0,_,_)-> % failed to change in 3 rounds done
@@ -311,7 +306,6 @@ pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
 spawnMultipleActors(NumberOfActorsToSpawn)->%DONE
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
 spawnMultipleActors(0,ListOfPid)->
-  %io:format("~p~n",[ListOfPid]),
   ListOfPid;
 spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid)->
   spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[]) | ListOfPid]).
