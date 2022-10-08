@@ -210,7 +210,7 @@ superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
   end,
   if %start algos
     Gossip == true->
-      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! "rumor", % tell random actor rumor to start process
+      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! "rumor from nicolas", % tell random actor rumor to start process
       gossipConvergenceCheck(Actors,erlang:monotonic_time()),
       actorKiller(Actors); % kill any actors not yet dead
     true ->
@@ -247,7 +247,7 @@ actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
 
 actorKiller(ListOfActors)->
-  hd(ListOfActors) ! die,
+  exit(hd(ListOfActors),kill),
   actorKiller(tl(ListOfActors)).
 
 actor(Broken)-> %starter actor decides which type of actor to run
@@ -277,28 +277,34 @@ actor(Broken)-> %starter actor decides which type of actor to run
   end.
 
 brokenGossipActor(Client,ListOfNeighbors)-> % regular actor but only runs once
-  gossipActor(Client,ListOfNeighbors,1,false).
+  gossipActor(Client,ListOfNeighbors,true).
 
 gossipActor(Client, ListOfNeighbors)->%DONE
-  gossipActor(Client,ListOfNeighbors,10,false).% stop after sharing rumor 10 times
+  gossipActor(Client,ListOfNeighbors,false).
 
-gossipActor(_,_,0,_)->
-  ok;
-gossipActor(Client,ListOfNeighbors,N,true)->
-  receive
-    Rumor ->
-      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor
-  end,
-  gossipActor(Client,ListOfNeighbors,N-1,true);
-gossipActor(Client,ListOfNeighbors,N,false)-> % end boolean track if rumor has been heard before
+gossipActor(Client,ListOfNeighbors,Broken)-> % end boolean track if rumor has been heard before
   receive
     Rumor ->
       lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
       % tell supervisor I have heard rumor once. do only on first listen
-      Client ! {done, self()}
-      %io:format("Got rumor ~p~n",[self()])
-  end,
-  gossipActor(Client,ListOfNeighbors,N-1,true). % Done = true as has to have heard rumor to have gotten here
+      Client ! {done, self()},
+      sendRumor(ListOfNeighbors,Rumor,Broken)
+  end.
+
+sendRumor(ListOfNeighbors,Rumor,Broken)->
+  lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
+  if
+    Broken == true -> % send rumor once then die
+      ok;
+    true ->
+      {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue
+      if
+         RumorCount >= 9-> % 9  in queue + 1 processed = 10 received
+          ok; % heard 10 times die
+        true ->
+          sendRumor(ListOfNeighbors,Rumor,Broken)
+      end
+  end.
 
 brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
   receive
