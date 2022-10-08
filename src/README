@@ -20,3 +20,11 @@ Largest networks with algorithm I got to work(converge):
         full:
         2D:
         imperfect2D:
+Bonus:
+I implemented node death for both gossip and pushSum. My version of node death is that after receiving a rumor or a
+S and W pair a single actor will perform a single send action and then become unresponsive(DIE). All other nodes operate
+normally. This implementation seemed the most interesting as I wanted to mostly see its effect on the pushSum as A large
+amount of the Sum would be lost. In gossip this would still allow for convergence as I had defined above but slow the
+dispersion of the rumor. This implementation allows for pushSum to also converge as defined above. The implementation
+though is still disruptive as it can no longer guarantee convergence to a correct answer in pushSum or convergence in
+gossip in cases where the unaltered nodes had converged before.

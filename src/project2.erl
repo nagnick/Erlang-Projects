@@ -1,7 +1,7 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([actor/0,superVisor/3]).
+-export([actor/1,superVisor/3,superVisor/4]).
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
   makeGrid(N,M,M,N,List,[],[]).
 
@@ -162,7 +162,10 @@ linkInLine(I,List,Gossip)->%DONE
   end,
   linkInLine(I -1,List,Gossip).
 
-superVisor(NumberOfActors, Topology, Algo)->%DONE
+superVisor(NumberOfActors, Topology, Algo)-> %normal run without bonus implementation
+  superVisor(NumberOfActors,Topology,Algo,false).
+
+superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
   if
     Algo == gossip ->
       Gossip = true;
@@ -172,25 +175,32 @@ superVisor(NumberOfActors, Topology, Algo)->%DONE
       Gossip = true,% just for compiler warning doesnt get used
       throw("Not a valid Algo enter gossip or pushSum")
   end,
+  if
+    Bonus == true ->
+      %Number of actors isn't the true range in the 2d cases but its fine just need a random actor
+      BrokenActor = rand:uniform(NumberOfActors); % single actor to kill after a single receive/send action
+    true ->
+      BrokenActor = -1 % don't break any actors
+  end,
   if % start topology building
     Topology == line->
       ActualNumOfActors = NumberOfActors,
-      Actors = spawnMultipleActors(NumberOfActors),
+      Actors = spawnMultipleActors(NumberOfActors,BrokenActor),
       linkInLine(NumberOfActors,Actors,Gossip);
     Topology == full->
       ActualNumOfActors = NumberOfActors,
-      Actors = spawnMultipleActors(NumberOfActors),
+      Actors = spawnMultipleActors(NumberOfActors,BrokenActor),
       fullLink(NumberOfActors,Actors,Gossip);
     Topology == imp2D->
       W = round(math:ceil(math:sqrt(NumberOfActors))),
       ActualNumOfActors = W*W,
-      Actors = spawnMultipleActors(ActualNumOfActors),
+      Actors = spawnMultipleActors(ActualNumOfActors,BrokenActor),
       Grid = makeGrid(W,W,Actors),
       gridLink(Grid,W,W,ActualNumOfActors,true,Gossip);% true to add random actor to neighbor list
     Topology == '2D' ->
       W = round(math:ceil(math:sqrt(NumberOfActors))),
       ActualNumOfActors = W*W,
-      Actors = spawnMultipleActors(ActualNumOfActors),
+      Actors = spawnMultipleActors(ActualNumOfActors,BrokenActor),
       Grid = makeGrid(W,W,Actors),
       gridLink(Grid,W,W,ActualNumOfActors,false,Gossip);
     true ->
@@ -240,21 +250,34 @@ actorKiller(ListOfActors)->
   hd(ListOfActors) ! die,
   actorKiller(tl(ListOfActors)).
 
-actor()-> %% work in progress
+actor(Broken)-> %starter actor decides which type of actor to run
   receive
     List->
       Gossip = hd(List),
       if
       Gossip == true ->
         PIDs = tl(List),
-        gossipActor(hd(PIDs),tl(PIDs));
+        if
+          Broken == true -> % setup broken actor
+            brokenGossipActor(hd(PIDs),tl(PIDs));
+          true -> % setup regular actor
+            gossipActor(hd(PIDs),tl(PIDs))
+        end;
       true -> % pushsum
         Tail = tl(List),
         ActorNum = hd(Tail),
         PIDs = tl(Tail),
-        pushSumActor(hd(PIDs),ActorNum,tl(PIDs))
+        if
+          Broken == true -> % setup broken actor
+            brokenPushSumActor(ActorNum,tl(PIDs));
+          true -> % setup regular actor
+            pushSumActor(hd(PIDs),ActorNum,tl(PIDs))
+        end
       end
-end.
+  end.
+
+brokenGossipActor(Client,ListOfNeighbors)-> % regular actor but only runs once
+  gossipActor(Client,ListOfNeighbors,1,false).
 
 gossipActor(Client, ListOfNeighbors)->%DONE
   gossipActor(Client,ListOfNeighbors,10,false).% stop after sharing rumor 10 times
@@ -267,19 +290,28 @@ gossipActor(Client,ListOfNeighbors,N,true)->
       lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor
   end,
   gossipActor(Client,ListOfNeighbors,N-1,true);
-gossipActor(Client,ListOfNeighbors,N,false)->
+gossipActor(Client,ListOfNeighbors,N,false)-> % end boolean track if rumor has been heard before
   receive
     Rumor ->
       lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
       % tell supervisor I have heard rumor once. do only on first listen
-      Client ! {done, self()},
-      io:format("Got rumor ~p~n",[self()])
+      Client ! {done, self()}
+      %io:format("Got rumor ~p~n",[self()])
   end,
   gossipActor(Client,ListOfNeighbors,N-1,true). % Done = true as has to have heard rumor to have gotten here
 
+brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
+  receive
+    {MS,MW}->
+      SS = MS+S,
+      SW = MW +0,
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {SS/2,SW/2}; % send half
+    start -> % sent by supervisor to start pushsum
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,1/2}
+  end,
+  ok.
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
   pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
-
 pushSumActor(Client,S,W,_,0,_,_)-> % failed to change in 3 rounds done
   Sum = S/W,
   Client ! {done, self(),Sum},% tell supervisor I have converged
@@ -303,9 +335,11 @@ pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
   end,
   ok.
 
-spawnMultipleActors(NumberOfActorsToSpawn)->%DONE
-  spawnMultipleActors(NumberOfActorsToSpawn,[]).
-spawnMultipleActors(0,ListOfPid)->
+spawnMultipleActors(NumberOfActorsToSpawn,BrokenActor)->%DONE
+  spawnMultipleActors(NumberOfActorsToSpawn,[],BrokenActor).
+spawnMultipleActors(0,ListOfPid,_)->
   ListOfPid;
-spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid)->
-  spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[]) | ListOfPid]).
+spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid,0)-> % got to broken actor spawn broken one
+  spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[true]) | ListOfPid],-1);
+spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid,BrokenActor)->
+  spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[false]) | ListOfPid],BrokenActor-1).
