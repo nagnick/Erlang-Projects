@@ -115,9 +115,9 @@ fullLink(1,List,Gossip)-> %give every actor a list of all actors first element i
   PIDS = List -- [Actor],% remove itself from neighbors
   if
     Gossip == true->
-      Actor ! [Gossip, self()] ++ PIDS; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self() |PIDS]; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, 1] ++ [self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, 1,self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   ok;
 fullLink(I,List,Gossip)->%DONE
@@ -125,9 +125,9 @@ fullLink(I,List,Gossip)->%DONE
   PIDS = List -- [Actor], % remove itself from neighbors
   if
     Gossip == true->
-      Actor ! [Gossip, self()] ++ PIDS; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self() | PIDS]; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, I] ++ [self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, I, self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   fullLink(I-1,List,Gossip).
 
@@ -135,9 +135,9 @@ linkInLine(1,List,Gossip)->%DONE
   Actor = lists:nth(1,List), % send second item in list to first item in list
   if
     Gossip == true->
-      Actor ! [Gossip, self(),lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+      Actor ! [Gossip, self() ,lists:nth(2,List)]; %list[algotype,supervisorPID,NeighborPIDs];
     true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, 1] ++ [self()| lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+      Actor ! [Gossip, 1 ,self(),lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   ok;
 linkInLine(I,List,Gossip)->%DONE
@@ -146,18 +146,18 @@ linkInLine(I,List,Gossip)->%DONE
       Actor = lists:nth(I,List),
       if
         Gossip == true->
-          Actor ! [Gossip, self(),lists:nth(I -1,List)]; %list[algotype,supervisorPID,NeighborPIDs];
+          Actor ! [Gossip,self(),lists:nth(I -1,List)]; %list[algotype,supervisorPID,NeighborPIDs];
         true -> % push sum give algo info as well which is actor number I
-          Actor ! [Gossip, I] ++ [self()| lists:nth(I -1,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+          Actor ! [Gossip, I,self(), lists:nth(I -1,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
       end;
     true ->
       Actor = lists:nth(I,List),
       Neighbors = [lists:nth(I -1,List), lists:nth(I +1,List)],
       if
         Gossip == true->
-          Actor ! [Gossip, self()] ++ Neighbors; %list[algotype,supervisorPID,NeighborPIDs];
+          Actor ! [Gossip, self()| Neighbors]; %list[algotype,supervisorPID,NeighborPIDs];
         true -> % push sum give algo info as well which is actor number I
-          Actor ! [Gossip, I] ++ [self()| Neighbors]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+          Actor ! [Gossip, I,self()| Neighbors]  %list[algotype,algoinfo = I,supervisorPID,NeighborPIDs]
       end
   end,
   linkInLine(I -1,List,Gossip).
@@ -202,9 +202,11 @@ superVisor(NumberOfActors, Topology, Algo)->%DONE
     Gossip == true->
       lists:nth(rand:uniform(ActualNumOfActors),Actors) ! "rumor", % tell random actor rumor to start process
       gossipConvergenceCheck(Actors,erlang:monotonic_time()),
-      actorKiller(Actors);
+      actorKiller(Actors); % kill any actors not yet dead
     true ->
-      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! start
+      lists:nth(rand:uniform(ActualNumOfActors),Actors) ! start,
+      pushSumConvergenceCheck(Actors,erlang:monotonic_time()),
+      actorKiller(Actors) % kill any actors not yet dead
   end,
   ok.
 
@@ -220,8 +222,20 @@ gossipConvergenceCheck(ListOfActors,StartTime)->
       gossipConvergenceCheck(PIDs,StartTime)
   end.
 
+pushSumConvergenceCheck([],StartTime)->
+  EndTime = erlang:monotonic_time(),%recommend replacement to now()
+  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
+  io:format("REAL TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  ok;
+pushSumConvergenceCheck(_,StartTime)->
+  receive
+    {done, PID,Sum} ->
+      io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]),
+      pushSumConvergenceCheck([],StartTime) % push sum only needs one node to converge to get answer
+  end.
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
+
 actorKiller(ListOfActors)->
   hd(ListOfActors) ! die,
   actorKiller(tl(ListOfActors)).
@@ -243,8 +257,8 @@ actor()-> %% work in progress
 end.
 
 gossipActor(Client, ListOfNeighbors)->%DONE
-  io:format("Client~p~n",[Client]),
-  io:format("~w~n",[ListOfNeighbors]),
+%%  io:format("Client~p~n",[Client]),
+%%  io:format("~w~n",[ListOfNeighbors]),
   gossipActor(Client,ListOfNeighbors,10,false).% stop after sharing rumor 10 times
 
 gossipActor(_,_,0,_)->
@@ -259,19 +273,21 @@ gossipActor(Client,ListOfNeighbors,N,false)->
   receive
     Rumor ->
       lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
-      % tell supervisor I have heard rumor only do once
+      % tell supervisor I have heard rumor once. do only on first listen
       Client ! {done, self()},
       io:format("Got rumor ~p~n",[self()])
   end,
   gossipActor(Client,ListOfNeighbors,N-1,true). % Done = true as has to have heard rumor to have gotten here
 
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
-  io:format("Client~p~n",[Client]),
-  io:format("ActorNum~p~n",[S]),
-  io:format("~w~n",[ListOfNeighbors]),
-  pushSumActor(Client,S,1,ListOfNeighbors,3,S,math:pow(10,-10)).% 1 = w ; 3 is max number of rounds without change in ratio(last arg S)
+%%  io:format("Client~p~n",[Client]),
+%%  io:format("ActorNum~p~n",[S]),
+%%  io:format("~w~n",[ListOfNeighbors]),
+  pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
 
-pushSumActor(_,_,_,_,_,0,_)->
+pushSumActor(Client,S,W,_,0,_,_)-> % failed to change in 3 rounds done
+  Sum = S/W,
+  Client ! {done, self(),Sum},% tell supervisor I have converged
   ok;
 pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
   receive
@@ -287,15 +303,15 @@ pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
           pushSumActor(Client,SS/2,SW/2,ListOfNeighbors,Round-1,CurrentRatio,L)
       end;
     start -> % sent by supervisor to start pushsum
-      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,W/2},
-      pushSumActor(Client,S/2,W/2,ListOfNeighbors,3,LastRatio,L)
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,1/2},
+      pushSumActor(Client,S/2,1/2,ListOfNeighbors,3,(S/2)/(1/2),L) % all nodes w = 0 but starter node gets a weight of 1 so 1/2 after here
   end,
   ok.
 
 spawnMultipleActors(NumberOfActorsToSpawn)->%DONE
   spawnMultipleActors(NumberOfActorsToSpawn,[]).
 spawnMultipleActors(0,ListOfPid)->
-  io:format("~p~n",[ListOfPid]),
+  %io:format("~p~n",[ListOfPid]),
   ListOfPid;
 spawnMultipleActors(NumberOfActorsToSpawn,ListOfPid)->
   spawnMultipleActors(NumberOfActorsToSpawn-1,[spawn(project2,actor,[]) | ListOfPid]).
