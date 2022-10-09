@@ -245,7 +245,7 @@ pushSumConvergenceCheck([],StartTime)->
 pushSumConvergenceCheck(ListOfActors,StartTime)->
   receive
     {done, PID,Sum} ->
-      io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]),
+      %io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]), % used for testing
       pushSumConvergenceCheck(ListOfActors--[PID],StartTime) % push sum only needs one node to converge to get answer
   end.
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
@@ -329,6 +329,7 @@ pushSumActor(Client,S,W,ListOfNeighbors,0,LastRatio,L)-> % failed to change in 3
   Sum = S/W,
   Client ! {done, self(),Sum},% tell supervisor I have converged
   pushSumActor(Client,S,W,ListOfNeighbors,-1,LastRatio,L),% keep sending info but already converged(Continued participation required for total network convergence)
+  %above keeps from telling supervisor multiple times
   ok;
 pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
   receive
