@@ -285,14 +285,16 @@ gossipActor(Client, ListOfNeighbors)->%DONE
 gossipActor(Client,ListOfNeighbors,Broken)-> % end boolean track if rumor has been heard before
   receive
     Rumor ->
-      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
+      %lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
       % tell supervisor I have heard rumor once. do only on first listen
       Client ! {done, self()},
       sendRumor(ListOfNeighbors,Rumor,Broken)
   end.
-
+sendRumor([],_,_)->
+  ok;
 sendRumor(ListOfNeighbors,Rumor,Broken)->
-  lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
+  Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
+  Actor ! Rumor,
   if
     Broken == true -> % send rumor once then die
       ok;
@@ -302,7 +304,7 @@ sendRumor(ListOfNeighbors,Rumor,Broken)->
          RumorCount >= 9-> % 9  in queue + 1 processed = 10 received
           ok; % heard 10 times die
         true ->
-          sendRumor(ListOfNeighbors,Rumor,Broken)
+          sendRumor(ListOfNeighbors--[Actor],Rumor,Broken)% SHORTEN LIST TO HELP SPREAD RUMOR
       end
   end.
 
