@@ -242,11 +242,11 @@ pushSumConvergenceCheck([],StartTime)->
   REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,microsecond),
   io:format("CONVERGENCE TIME OF PROGRAM in microseconds:~p~n",[REALTIME]),
   ok;
-pushSumConvergenceCheck(_,StartTime)->
+pushSumConvergenceCheck(ListOfActors,StartTime)->
   receive
     {done, PID,Sum} ->
       io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]),
-      pushSumConvergenceCheck([],StartTime) % push sum only needs one node to converge to get answer
+      pushSumConvergenceCheck(ListOfActors--[PID],StartTime) % push sum only needs one node to converge to get answer
   end.
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
@@ -324,7 +324,7 @@ brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
   end,
   ok.
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
-  pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
+  pushSumActor(Client,S,1,ListOfNeighbors,3,S,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
 pushSumActor(Client,S,W,_,0,_,_)-> % failed to change in 3 rounds done
   Sum = S/W,
   Client ! {done, self(),Sum},% tell supervisor I have converged
