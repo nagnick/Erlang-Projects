@@ -291,7 +291,7 @@ gossipActor(Client,ListOfNeighbors,Broken)-> % end boolean track if rumor has be
       sendRumor(ListOfNeighbors,Rumor,Broken)
   end.
 sendRumor([],_,_)->
-  ok;
+  ok; % die all neighbors know rumor
 sendRumor(ListOfNeighbors,Rumor,Broken)->
   Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
   Actor ! Rumor,
@@ -302,7 +302,7 @@ sendRumor(ListOfNeighbors,Rumor,Broken)->
       {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue
       if
          RumorCount >= 9-> % 9  in queue + 1 processed = 10 received
-          ok; % heard 10 times die
+          ok; % heard 10 times die can die sooner if there are less than 10 neighbors in ListOfNeighbors
         true ->
           sendRumor(ListOfNeighbors--[Actor],Rumor,Broken)% SHORTEN LIST TO HELP SPREAD RUMOR
       end
