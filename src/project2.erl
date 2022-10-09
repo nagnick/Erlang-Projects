@@ -244,7 +244,7 @@ pushSumConvergenceCheck([],StartTime)->
   ok;
 pushSumConvergenceCheck(ListOfActors,StartTime)->
   receive
-    {done, PID,Sum} ->
+    {done, PID,_} ->% replace _ with Sum to see actor results
       %io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]), % used for testing
       pushSumConvergenceCheck(ListOfActors--[PID],StartTime) % push sum only needs one node to converge to get answer
   end.
@@ -287,17 +287,17 @@ brokenGossipActor(Client,ListOfNeighbors)-> % regular actor but only runs once
 gossipActor(Client, ListOfNeighbors)->%DONE
   gossipActor(Client,ListOfNeighbors,false).
 
-gossipActor(Client,ListOfNeighbors,Broken)-> % end boolean track if rumor has been heard before
+gossipActor(Client,ListOfNeighbors,Broken)-> % gossipActor started
   receive
     Rumor ->
-      %lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! Rumor,
-      % tell supervisor I have heard rumor once. do only on first listen
-      Client ! {done, self()},
-      sendRumor(ListOfNeighbors,Rumor,Broken)
+      gossipActor(Client,ListOfNeighbors,Broken,Rumor)
   end.
-sendRumor([],_,_)->
-  ok; % die all neighbors know rumor
-sendRumor(ListOfNeighbors,Rumor,Broken)->
+gossipActor(converged,ListOfNeighbors,Broken,Rumor)-> % only send actor once converged
+  Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
+  Actor ! Rumor, % keep spreading rumor but node has converged
+  gossipActor(converged,ListOfNeighbors,Broken,Rumor), % infinite loop killed buy supervisor with killActor
+  ok;
+gossipActor(Client,ListOfNeighbors,Broken,Rumor)->
   Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
   Actor ! Rumor,
   if
@@ -307,9 +307,12 @@ sendRumor(ListOfNeighbors,Rumor,Broken)->
       {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue prevents blocking like receive does
       if
          RumorCount >= 9-> % 9  in queue + 1 processed = 10 received
-          ok; % heard 10 times die can die sooner if there are less than 10 neighbors in ListOfNeighbors
+           % tell supervisor I have heard rumor 10 times. do only once
+           Client ! {done, self()},
+           gossipActor(converged,ListOfNeighbors,Broken,Rumor),
+          ok;
         true ->
-          sendRumor(ListOfNeighbors--[Actor],Rumor,Broken)% SHORTEN LIST TO HELP SPREAD RUMOR
+          gossipActor(Client,ListOfNeighbors,Broken,Rumor)
       end
   end.
 
