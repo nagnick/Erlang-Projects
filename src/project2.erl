@@ -222,8 +222,8 @@ superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
 
 gossipConvergenceCheck([],StartTime)->
   EndTime = erlang:monotonic_time(),%recommend replacement to now()
-  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
-  io:format("CONVERGENCE TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,microsecond),
+  io:format("CONVERGENCE TIME OF PROGRAM in microseconds:~p~n",[REALTIME]),
   ok;
 gossipConvergenceCheck(ListOfActors,StartTime)->
   receive
@@ -234,8 +234,8 @@ gossipConvergenceCheck(ListOfActors,StartTime)->
 
 pushSumConvergenceCheck([],StartTime)->
   EndTime = erlang:monotonic_time(),%recommend replacement to now()
-  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,millisecond),
-  io:format("CONVERGENCE TIME OF PROGRAM in milliseconds:~p~n",[REALTIME]),
+  REALTIME = erlang:convert_time_unit(EndTime-StartTime,native,microsecond),
+  io:format("CONVERGENCE TIME OF PROGRAM in microseconds:~p~n",[REALTIME]),
   ok;
 pushSumConvergenceCheck(_,StartTime)->
   receive
