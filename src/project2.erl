@@ -324,10 +324,11 @@ brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
   end,
   ok.
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
-  pushSumActor(Client,S,1,ListOfNeighbors,3,S,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
-pushSumActor(Client,S,W,_,0,_,_)-> % failed to change in 3 rounds done
+  pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
+pushSumActor(Client,S,W,ListOfNeighbors,0,LastRatio,L)-> % failed to change in 3 rounds done
   Sum = S/W,
   Client ! {done, self(),Sum},% tell supervisor I have converged
+  pushSumActor(Client,S,W,ListOfNeighbors,-1,LastRatio,L),% keep sending info but already converged(Continued participation required for total network convergence)
   ok;
 pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
   receive
