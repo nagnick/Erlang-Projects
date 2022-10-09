@@ -329,6 +329,7 @@ brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
   end,
   ok.
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
+  % all actors start with w = 0 the starter node get an update later to w = 1
   pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
 pushSumActor(Client,S,W,ListOfNeighbors,0,LastRatio,L)-> % failed to change in 3 rounds done
   Sum = S/W,
