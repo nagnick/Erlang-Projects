@@ -302,6 +302,8 @@ gossipActor(Client,ListOfNeighbors,Broken,Rumor)->
   Actor ! Rumor,
   if
     Broken == true -> % send rumor once then die
+      Client ! {done, self()},% tells supervisor it converged though this is not true and real life would not be so kind,
+      % this allows me to see the slow down of convergence if a node is lost by having the supervisor terminate normally
       ok;
     true ->
       {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue prevents blocking like receive does
