@@ -274,7 +274,7 @@ actor(Broken)-> %starter actor decides which type of actor to run
         PIDs = tl(Tail),
         if
           Broken == true -> % setup broken actor
-            brokenPushSumActor(ActorNum,tl(PIDs));
+            brokenPushSumActor(hd(PIDs),ActorNum,tl(PIDs));
           true -> % setup regular actor
             pushSumActor(hd(PIDs),ActorNum,tl(PIDs))
         end
@@ -295,7 +295,7 @@ gossipActor(Client,ListOfNeighbors,Broken)-> % gossipActor started
 gossipActor(converged,ListOfNeighbors,Broken,Rumor)-> % only send actor once converged
   Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
   Actor ! Rumor, % keep spreading rumor but node has converged
-  gossipActor(converged,ListOfNeighbors,Broken,Rumor), % infinite loop killed buy supervisor with killActor
+  gossipActor(converged,ListOfNeighbors,Broken,Rumor), % infinite loop killed by supervisor with killActor
   ok;
 gossipActor(Client,ListOfNeighbors,Broken,Rumor)->
   Actor = lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors),
@@ -318,14 +318,16 @@ gossipActor(Client,ListOfNeighbors,Broken,Rumor)->
       end
   end.
 
-brokenPushSumActor(S,ListOfNeighbors)-> % broken so only runs once
+brokenPushSumActor(Client,S,ListOfNeighbors)-> % broken so only runs once
   receive
     {MS,MW}->
       SS = MS+S,
       SW = MW +0,
-      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {SS/2,SW/2}; % send half
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {SS/2,SW/2}, % send half
+      Client ! {done, self(),(SS/2)/(SW/2)};% tell supervisor I have converged not true but to test converge time after death of node after 1 send/receive
     start -> % sent by supervisor to start pushsum
-      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,1/2}
+      lists:nth(rand:uniform(length(ListOfNeighbors)),ListOfNeighbors) ! {S/2,1/2},
+      Client ! {done, self(),(S/2)/(1/2)}% tell supervisor I have converged not true but to test converge time after death of node after 1 send/receive
   end,
   ok.
 pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
