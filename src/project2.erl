@@ -1,7 +1,8 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([actor/1,superVisor/3,superVisor/4]).
+-export([actor/1,main/3,bonusMain/3,superVisor/4]).
+
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
   makeGrid(N,M,M,N,List,[],[]).
 
@@ -162,8 +163,12 @@ linkInLine(I,List,Gossip)->%DONE
   end,
   linkInLine(I -1,List,Gossip).
 
-superVisor(NumberOfActors, Topology, Algo)-> %normal run without bonus implementation
-  superVisor(NumberOfActors,Topology,Algo,false).
+main(NumberOfActors, Topology, Algo)-> %normal run without bonus implementation
+  spawn(project2,superVisor,[NumberOfActors,Topology,Algo,false]),% spwan supervisor to ensure clean slate each run (nothing left in message buffers)
+  ok.
+bonusMain(NumberOfActors, Topology, Algo)->
+  spawn(project2,superVisor,[NumberOfActors,Topology,Algo,true]),%true to run broken nodes
+  ok.
 
 superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
   if
@@ -299,7 +304,7 @@ sendRumor(ListOfNeighbors,Rumor,Broken)->
     Broken == true -> % send rumor once then die
       ok;
     true ->
-      {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue
+      {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue prevents blocking like receive does
       if
          RumorCount >= 9-> % 9  in queue + 1 processed = 10 received
           ok; % heard 10 times die can die sooner if there are less than 10 neighbors in ListOfNeighbors
