@@ -4,7 +4,7 @@ What is working:
     All 4 topologies work and both algorithms work.
     Example usage: project2:main(2,line,gossip).
     first argument is number of nodes this will be rounded up in both of the 2d topologies to create a perfect square.
-    second argument is the topology  possible inputs: [line,full,'2D',imp2D] all atoms
+    second argument is the topology  possible inputs: [line,full,'2D',imp3D] all atoms
     third argument is the algorithm possible inputs: [gossip, pushSum] all atoms
 Important information about my implementation:
     gossip convergence is defined as all actors in network hearing rumor 10 times.
@@ -14,12 +14,12 @@ Largest networks with algorithm I got to work(converge):
         line: anything above 640 nodes takes too long.
         full: anything above 20480 nodes takes too long.
         2D: anything above 5120 nodes takes too long.
-        imperfect2D: anything above 2560 takes too long.
+        imperfect3D:
     pushSum:
         line: anything above 640 nodes takes way too long.
         full: anything above 40960 nodes takes way too long.
         2D: anything above 10240 nodes takes way too long.
-        imperfect2D: anything above 81920 takes way too long.
+        imperfect3D:
 Bonus:
 Example usage: project2:bonusMain(2,line,gossip).
 I implemented node death for both gossip and pushSum. My version of node death is that after receiving a rumor or a

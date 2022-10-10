@@ -218,7 +218,6 @@ superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
       ActualNumOfActors = W*W*W,
       Actors = spawnMultipleActors(ActualNumOfActors,BrokenActor),
       Cube = makeCube(W,W,W,Actors),
-      io:format("~w~n",[Cube]),
       imperfectCubeLink(Cube,W,W,Actors,Gossip);
     Topology == '2D' ->
       W = round(math:ceil(math:sqrt(NumberOfActors))),
@@ -284,7 +283,6 @@ actor(Broken)-> %starter actor decides which type of actor to run
           Broken == true -> % setup broken actor
             brokenGossipActor(hd(PIDs),tl(PIDs));
           true -> % setup regular actor
-            io:format("~p~n",[tl(PIDs)]),
             gossipActor(hd(PIDs),tl(PIDs))
         end;
       true -> % pushsum
