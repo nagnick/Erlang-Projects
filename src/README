@@ -13,13 +13,14 @@ Largest networks with algorithm I got to work(converge):
     gossip:
         line: anything above 640 nodes takes too long.
         full: anything above 20480 nodes takes too long.
-        2D: anything above 5120 nodes takes too long.
-        imperfect3D:
+        2D: anything above 2560 nodes takes too long.
+        imperfect3D: anything above 2560 nodes takes too long.
     pushSum:
         line: anything above 640 nodes takes way too long.
         full: anything above 40960 nodes takes way too long.
         2D: anything above 10240 nodes takes way too long.
-        imperfect3D:
+        imperfect3D: anything above 81920 takes too long.
+    (Takes too long = did not converge within 5 minutes)
 Bonus:
 Example usage: project2:bonusMain(2,line,gossip).
 I implemented node death for both gossip and pushSum. My version of node death is that after receiving a rumor or a

@@ -228,7 +228,7 @@ superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
     true ->
       ActualNumOfActors = NumberOfActors, % just for compiler safety
       Actors = [],% just for compiler safety
-      throw("Not a valid Topology. Valid options: [line,full,'2D',imp2D")
+      throw("Not a valid Topology. Valid options: [line,full,'2D',imp3D]")
   end,
   if %start algos
     Gossip == true->
