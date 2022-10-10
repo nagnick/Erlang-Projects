@@ -262,8 +262,8 @@ pushSumConvergenceCheck([],StartTime)->
 pushSumConvergenceCheck(ListOfActors,StartTime)->
   receive
     {done, PID,_} ->% replace _ with Sum to see actor results
-      %io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]), % used for testing
-      pushSumConvergenceCheck(ListOfActors--[PID],StartTime) % push sum only needs one node to converge to get answer
+      %io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]), % used for testing to show converged to value of individual nodes
+      pushSumConvergenceCheck(ListOfActors--[PID],StartTime)
   end.
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
