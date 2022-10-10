@@ -1,7 +1,7 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([actor/1,main/3,bonusMain/3,superVisor/4,makeCube/4,spawnMultipleActors/2]).
+-export([actor/1,main/3,bonusMain/3,superVisor/4]).
 
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
   makeGrid(N,M,M,N,List,[],[]).
