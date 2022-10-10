@@ -3,12 +3,13 @@ Project 2 COP5615
 What is working:
     All 4 topologies work and both algorithms work.
     Example usage: project2:main(2,line,gossip).
-    first argument is number of nodes this will be rounded up in both of the 2d topologies to create a perfect square.
+    first argument is number of nodes this will be rounded up in both the 2d topology to create a perfect square and 3D
+    to create a Cube.
     second argument is the topology  possible inputs: [line,full,'2D',imp3D] all atoms
     third argument is the algorithm possible inputs: [gossip, pushSum] all atoms
 Important information about my implementation:
     gossip convergence is defined as all actors in network hearing rumor 10 times.
-    pushSum convergence is defined as all actors converging to the expected sum within some expected error.
+    pushSum convergence is defined as all actors converging to the expected sum(node ratio stabilizing).
 Largest networks with algorithm I got to work(converge):
     gossip:
         line: anything above 640 nodes takes too long.
@@ -29,4 +30,6 @@ normally. This implementation seemed the most interesting as I wanted to mostly 
 amount of the Sum would be lost. In gossip this would still allow for convergence as I had defined above but slow the
 dispersion of the rumor. This implementation does not allow for pushSum to converge as defined above. The implementation
 is disruptive as it can no longer guarantee convergence to an answer in pushSum as too much information is
-lost with the death of a node.
+lost with the death of a node. For both pushSum and gossip the node that dies is kind and tells the supervisor it converged
+before dying which allows me to properly time network convergence or in the case of pushSum it never converges. In the real
+world the nodes would not be this kind.
