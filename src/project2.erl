@@ -3,12 +3,12 @@
 -import(rand,[uniform/1]).
 -export([actor/1,main/3,bonusMain/3,superVisor/4]).
 
-makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
+makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list
   makeGrid(N,M,M,N,List,[],[]).
 
-makeGrid(0,0,_,_,_,Grid,Row)->%DONE
+makeGrid(0,0,_,_,_,Grid,Row)->
   lists:append(Grid,[Row]);
-makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
+makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->
   if
     Grid == [] ->
       NewGrid = [Row];
@@ -16,7 +16,7 @@ makeGrid(N,0,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
       NewGrid = lists:append(Grid,[Row])
   end,
   makeGrid(N-1,NumOfCol,NumOfCol,NumOfRow,List,NewGrid,[]);
-makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
+makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->
   if
     length(List) < 2 ->
       makeGrid(0,M-1,NumOfCol,NumOfRow,[],Grid,Row++[hd(List)]);
@@ -33,7 +33,7 @@ makeCube(N,M,H,NumberOfGrids,ListOfActors,CurrentCube)->
   NewCube = lists:append(CurrentCube,[makeGrid(N,M,ActorsForGrid)]),
  makeCube(N,M,H,NumberOfGrids-1,ListOfActors--ActorsForGrid, NewCube).
 
-getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->%DONE
+getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->
   if
     ActorRow == 1 -> % no top row
       [];
@@ -54,7 +54,7 @@ getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->%DONE
       Right ++ [lists:nth(ActorCol,TopRow)] ++ Left
   end.
 
-getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->%DONE
+getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->
   if
     ActorRow == NumRow -> % no bottom row
       [];
@@ -75,9 +75,9 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->%DONE
       Right ++ [lists:nth(ActorCol,BottomRow)] ++ Left
   end.
 
-gridLink(_,_,_,0,_,_)->%DONE
+gridLink(_,_,_,0,_,_)->
   ok;
-gridLink(Grid,Rows,Columns,I,Gossip,RandomActors)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%DONE
+gridLink(Grid,Rows,Columns,I,Gossip,RandomActors)-> % creates a list of neighbor actors for each actor in grid and sends it to actor
   Temp1 = (I div Columns), %calculate actor index in 2d grid
   if Temp1 == 0->
     ActorRowNumber = Rows; % 0 remapped to end
@@ -90,8 +90,8 @@ gridLink(Grid,Rows,Columns,I,Gossip,RandomActors)-> % creates a list of neighbor
     true ->
       ActorColNumber = Temp2
       end,
-  ActorRow = lists:nth(ActorRowNumber,Grid), % plus one no zero index
-  Actor = lists:nth(ActorColNumber,ActorRow), % plus one no zero index
+  ActorRow = lists:nth(ActorRowNumber,Grid),
+  Actor = lists:nth(ActorColNumber,ActorRow),
   TopRow = getTopNeighbors(Grid,ActorRowNumber,ActorColNumber,Columns),
   BottomRow = getBottomNeighbors(Grid,ActorRowNumber,ActorColNumber,Rows,Columns),
   if
@@ -128,7 +128,7 @@ imperfectCubeLink(Cube,H,CurrentGrid,ListOfActors,Gossip)->
   gridLink(Grid,H,H,H*H,Gossip,RandomActors),
   imperfectCubeLink(Cube,H,CurrentGrid -1,ListOfActors,Gossip).
 
-fullLink(1,List,Gossip)-> %give every actor a list of all actors first element is the supervisor PID%DONE
+fullLink(1,List,Gossip)-> %give every actor a list of all actors first element is the supervisor PID
   Actor = lists:nth(1,List),
   PIDS = List -- [Actor],% remove itself from neighbors
   if
@@ -138,7 +138,7 @@ fullLink(1,List,Gossip)-> %give every actor a list of all actors first element i
       Actor ! [Gossip, 1,self()| PIDS]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   ok;
-fullLink(I,List,Gossip)->%DONE
+fullLink(I,List,Gossip)->
   Actor = lists:nth(I,List),
   PIDS = List -- [Actor], % remove itself from neighbors
   if
@@ -149,7 +149,7 @@ fullLink(I,List,Gossip)->%DONE
   end,
   fullLink(I-1,List,Gossip).
 
-linkInLine(1,List,Gossip)->%DONE
+linkInLine(1,List,Gossip)->
   Actor = lists:nth(1,List), % send second item in list to first item in list
   if
     Gossip == true->
@@ -158,7 +158,7 @@ linkInLine(1,List,Gossip)->%DONE
       Actor ! [Gossip, 1 ,self(),lists:nth(2,List)]  %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
   end,
   ok;
-linkInLine(I,List,Gossip)->%DONE
+linkInLine(I,List,Gossip)->
   if
     I == length(List) -> % end of list give second to last pid
       Actor = lists:nth(I,List),
@@ -184,10 +184,10 @@ main(NumberOfActors, Topology, Algo)-> %normal run without bonus implementation
   spawn(project2,superVisor,[NumberOfActors,Topology,Algo,false]),% spwan supervisor to ensure clean slate each run (nothing left in message buffers)
   ok.
 bonusMain(NumberOfActors, Topology, Algo)->
-  spawn(project2,superVisor,[NumberOfActors,Topology,Algo,true]),%true to run broken nodes
+  spawn(project2,superVisor,[NumberOfActors,Topology,Algo,true]),%true to run with single broken node
   ok.
 
-superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
+superVisor(NumberOfActors, Topology, Algo,Bonus)->
   if
     Algo == gossip ->
       Gossip = true;
@@ -265,9 +265,9 @@ pushSumConvergenceCheck(ListOfActors,StartTime)->
       %io:format("Actor: ~p returned sum: ~w~n",[PID,Sum]), % used for testing to show converged to value of individual nodes
       pushSumConvergenceCheck(ListOfActors--[PID],StartTime)
   end.
+
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
-
 actorKiller(ListOfActors)->
   exit(hd(ListOfActors),kill),
   actorKiller(tl(ListOfActors)).
@@ -320,7 +320,7 @@ gossipActor(Client,ListOfNeighbors,Broken,Rumor)->
   if
     Broken == true -> % send rumor once then die
       Client ! {done, self()},% tells supervisor it converged though this is not true and real life would not be so kind,
-      % this allows me to see the slow down of convergence if a node is lost by having the supervisor terminate normally
+      % this allows me to see the time of convergence if a node is lost by having the supervisor terminate normally
       ok;
     true ->
       {_,RumorCount} = erlang:process_info(self(), message_queue_len),% how many messages are in my queue prevents blocking like receive does
@@ -347,7 +347,7 @@ brokenPushSumActor(Client,S,ListOfNeighbors)-> % broken so only runs once
       Client ! {done, self(),(S/2)/(1/2)}% tell supervisor I have converged not true but to test converge time after death of node after 1 send/receive
   end,
   ok.
-pushSumActor(Client,S, ListOfNeighbors) ->%work in progress
+pushSumActor(Client,S, ListOfNeighbors) ->
   % all actors start with w = 0 the starter node get an update later to w = 1
   pushSumActor(Client,S,0,ListOfNeighbors,3,0,math:pow(10,-10)).% 0 = w ; 3 is max number of rounds without change in ratio(last arg S)
 pushSumActor(Client,S,W,ListOfNeighbors,0,LastRatio,L)-> % failed to change in 3 rounds done
@@ -375,7 +375,7 @@ pushSumActor(Client,S,W,ListOfNeighbors,Round,LastRatio,L)->
   end,
   ok.
 
-spawnMultipleActors(NumberOfActorsToSpawn,BrokenActor)->%DONE
+spawnMultipleActors(NumberOfActorsToSpawn,BrokenActor)->
   spawnMultipleActors(NumberOfActorsToSpawn,[],BrokenActor).
 spawnMultipleActors(0,ListOfPid,_)->
   ListOfPid;
