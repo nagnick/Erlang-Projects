@@ -1,7 +1,7 @@
 
 -module(project2).
 -import(rand,[uniform/1]).
--export([actor/1,main/3,bonusMain/3,superVisor/4]).
+-export([actor/1,main/3,bonusMain/3,superVisor/4,makeCube/4,spawnMultipleActors/2]).
 
 makeGrid(N,M,List)-> % assumes N*M = number of elements in List true with supervisor creating list %DONE
   makeGrid(N,M,M,N,List,[],[]).
@@ -23,6 +23,15 @@ makeGrid(N,M,NumOfCol,NumOfRow,List,Grid,Row)->%DONE
     true ->
       makeGrid(N,M-1,NumOfCol,NumOfRow,tl(List),Grid,Row++[hd(List)])
   end.
+
+makeCube(N,M,H,ListOfActors)-> % makes a cube aka a list of grids
+  makeCube(N,M,H,H,ListOfActors,[]).
+makeCube(N,M,_,1,ListOfActors,CurrentCube)->
+  lists:append(CurrentCube,[makeGrid(N,M,ListOfActors)]);
+makeCube(N,M,H,NumberOfGrids,ListOfActors,CurrentCube)->
+  ActorsForGrid = lists:nthtail(length(ListOfActors)-(N*M), ListOfActors),
+  NewCube = lists:append(CurrentCube,[makeGrid(N,M,ActorsForGrid)]),
+ makeCube(N,M,H,NumberOfGrids-1,ListOfActors--ActorsForGrid, NewCube).
 
 getTopNeighbors(Grid,ActorRow,ActorCol,NumCol)->%DONE
   if
@@ -68,7 +77,7 @@ getBottomNeighbors(Grid,ActorRow,ActorCol,NumRow, NumCol)->%DONE
 
 gridLink(_,_,_,0,_,_)->%DONE
   ok;
-gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%DONE
+gridLink(Grid,Rows,Columns,I,Gossip,RandomActors)-> % creates a list of neighbor actors for each actor in grid and sends it to actor%DONE
   Temp1 = (I div Columns), %calculate actor index in 2d grid
   if Temp1 == 0->
     ActorRowNumber = Rows; % 0 remapped to end
@@ -81,12 +90,6 @@ gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor ac
     true ->
       ActorColNumber = Temp2
       end,
-  if
-    Imperfect ->
-      Random = [lists:nth(rand:uniform(Columns),lists:nth(rand:uniform(Rows),Grid))];
-    true ->
-      Random = []
-  end,
   ActorRow = lists:nth(ActorRowNumber,Grid), % plus one no zero index
   Actor = lists:nth(ActorColNumber,ActorRow), % plus one no zero index
   TopRow = getTopNeighbors(Grid,ActorRowNumber,ActorColNumber,Columns),
@@ -104,12 +107,26 @@ gridLink(Grid,Rows,Columns,I,Imperfect,Gossip)-> % creates a list of neighbor ac
       Right = [lists:nth(ActorColNumber+1,ActorRow)]
   end,
   if
-    Gossip == true->
-      Actor ! [Gossip, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random; %list[algotype,supervisorPID,NeighborPIDs];
-    true -> % push sum give algo info as well which is actor number I
-      Actor ! [Gossip, I, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ Random %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+    RandomActors == []->
+      RandomActor = [];
+    true ->
+      RandomActor = [lists:nth(rand:uniform(length(RandomActors)),RandomActors)]
   end,
-  gridLink(Grid,Rows,Columns,I-1,Imperfect,Gossip).
+  if
+    Gossip == true->
+      Actor ! [Gossip, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ RandomActor; %list[algotype,supervisorPID,NeighborPIDs];
+    true -> % push sum give algo info as well which is actor number I
+      Actor ! [Gossip, I, self()] ++ TopRow ++ Left ++ Right ++ BottomRow ++ RandomActor %list[algotype,algoinfo I,supervisorPID,NeighborPIDs]
+  end,
+  gridLink(Grid,Rows,Columns,I-1,Gossip,RandomActors--RandomActor).
+
+imperfectCubeLink(_,_,0,_,_)->
+  ok;% done linking actors
+imperfectCubeLink(Cube,H,CurrentGrid,ListOfActors,Gossip)->
+  Grid = lists:nth(CurrentGrid,Cube),
+  RandomActors = ListOfActors -- lists:flatten(Grid),% let grid link use any actor that is not part of current grid for random neighbor
+  gridLink(Grid,H,H,H*H,Gossip,RandomActors),
+  imperfectCubeLink(Cube,H,CurrentGrid -1,ListOfActors,Gossip).
 
 fullLink(1,List,Gossip)-> %give every actor a list of all actors first element is the supervisor PID%DONE
   Actor = lists:nth(1,List),
@@ -196,18 +213,19 @@ superVisor(NumberOfActors, Topology, Algo,Bonus)->%DONE
       ActualNumOfActors = NumberOfActors,
       Actors = spawnMultipleActors(NumberOfActors,BrokenActor),
       fullLink(NumberOfActors,Actors,Gossip);
-    Topology == imp2D->
-      W = round(math:ceil(math:sqrt(NumberOfActors))),
-      ActualNumOfActors = W*W,
+    Topology == imp3D->
+      W = round(math:ceil(math:pow(NumberOfActors,1/3))),
+      ActualNumOfActors = W*W*W,
       Actors = spawnMultipleActors(ActualNumOfActors,BrokenActor),
-      Grid = makeGrid(W,W,Actors),
-      gridLink(Grid,W,W,ActualNumOfActors,true,Gossip);% true to add random actor to neighbor list
+      Cube = makeCube(W,W,W,Actors),
+      io:format("~w~n",[Cube]),
+      imperfectCubeLink(Cube,W,W,Actors,Gossip);
     Topology == '2D' ->
       W = round(math:ceil(math:sqrt(NumberOfActors))),
       ActualNumOfActors = W*W,
       Actors = spawnMultipleActors(ActualNumOfActors,BrokenActor),
       Grid = makeGrid(W,W,Actors),
-      gridLink(Grid,W,W,ActualNumOfActors,false,Gossip);
+      gridLink(Grid,W,W,ActualNumOfActors,Gossip,[]); % 2d so add no random actor
     true ->
       ActualNumOfActors = NumberOfActors, % just for compiler safety
       Actors = [],% just for compiler safety
@@ -266,6 +284,7 @@ actor(Broken)-> %starter actor decides which type of actor to run
           Broken == true -> % setup broken actor
             brokenGossipActor(hd(PIDs),tl(PIDs));
           true -> % setup regular actor
+            io:format("~p~n",[tl(PIDs)]),
             gossipActor(hd(PIDs),tl(PIDs))
         end;
       true -> % pushsum

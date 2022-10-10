@@ -7,19 +7,19 @@ What is working:
     second argument is the topology  possible inputs: [line,full,'2D',imp2D] all atoms
     third argument is the algorithm possible inputs: [gossip, pushSum] all atoms
 Important information about my implementation:
-    gossip convergence is defined as all actors in network hearing rumor.
-    pushSum convergence is defined as any one actor converging to the expected sum.
+    gossip convergence is defined as all actors in network hearing rumor 10 times.
+    pushSum convergence is defined as all actors converging to the expected sum within some expected error.
 Largest networks with algorithm I got to work(converge):
     gossip:
-        line:
-        full:
-        2D:
-        imperfect2D:
+        line: anything above 640 nodes takes too long.
+        full: anything above 20480 nodes takes too long.
+        2D: anything above 5120 nodes takes too long.
+        imperfect2D: anything above 2560 takes too long.
     pushSum:
-        line:
-        full:
-        2D:
-        imperfect2D:
+        line: anything above 640 nodes takes way too long.
+        full: anything above 40960 nodes takes way too long.
+        2D: anything above 10240 nodes takes way too long.
+        imperfect2D: anything above 81920 takes way too long.
 Bonus:
 Example usage: project2:bonusMain(2,line,gossip).
 I implemented node death for both gossip and pushSum. My version of node death is that after receiving a rumor or a
