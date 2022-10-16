@@ -17,17 +17,17 @@ findGEValue(SortedMapList,MinValue,Original)->
       findGEValue(tl(SortedMapList),MinValue,Original)
   end.
 
-createFingerTable(_,_,160,FingerTable) ->%List max size is 160
+createFingerTable(_,_,161,FingerTable) ->%List max size is 160
   FingerTable; % table is a list of {hashvalue,PID}
 createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fingerTable and current index being filled
-  io:format("~w",[ActorHash]),
-  NextEntryMinHash = (ActorHash + math:pow(2,I-1)) rem math:pow(2,160), % formula in doc hash size is 160 so table is 160
+  %io:format("~w",[is_integer(round(math:pow(2,I-1)))]),
+  NextEntryMinHash = (ActorHash + round(math:pow(2,I-1))) rem round(math:pow(2,160)), % formula in doc hash size is 160 so table is 160
   Hash = findGEValue(SortedListOfPids,NextEntryMinHash), %% get smallest actor hash to fill current spot
   NewFingerTable =  [Hash | FingerTable],
   createFingerTable(ActorHash,SortedListOfPids,I+1,NewFingerTable).
 
 chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of actor to run
-  io:format("ActorHashID:"),
+  io:format("ActorHashID:~w~n ~w~n~w",[HashId,FingerTable,length(FingerTable)]),
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
