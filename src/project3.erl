@@ -27,7 +27,7 @@ createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fin
   createFingerTable(ActorHash,SortedListOfPids,I+1,NewFingerTable).
 
 chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of actor to run
-  io:format("ActorHashID:~w~n ~w~n~w",[HashId,FingerTable,length(FingerTable)]),
+  io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable))]),
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
