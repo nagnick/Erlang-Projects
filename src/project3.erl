@@ -17,25 +17,24 @@ findGEValue(SortedMapList,MinValue,Original)->
       findGEValue(tl(SortedMapList),MinValue,Original)
   end.
 
-createFingerTable(_,_,161,FingerTable) ->%List max size is 160
+createFingerTable(_,_,0,FingerTable) ->%List max size is 160
   FingerTable; % table is a list of {hashvalue,PID}
 createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fingerTable and current index being filled
   %io:format("~w",[is_integer(round(math:pow(2,I-1)))]),
   NextEntryMinHash = (ActorHash + round(math:pow(2,I-1))) rem round(math:pow(2,160)), % formula in doc hash size is 160 so table is 160
   Hash = findGEValue(SortedListOfPids,NextEntryMinHash), %% get smallest actor hash to fill current spot
-  NewFingerTable =  [Hash | FingerTable],
-  createFingerTable(ActorHash,SortedListOfPids,I+1,NewFingerTable).
+  createFingerTable(ActorHash,SortedListOfPids,I-1,[Hash | FingerTable]).
 
 chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of actor to run
-  io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable))]),
+  io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
-      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),1,[]), % initial FingerTable is empty and start filling fingerTable at index 1
+      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
       chordActor(NewFingerTable,DataTable,HashId);
     {addActor,Pid,Id}->
       NewFingerTable = maps:put(Id,Pid,FingerTable),
-      createFingerTable(HashId,lists:keysort(1,maps:to_list(NewFingerTable)),1,[]), % update finger table by making a new one
+      createFingerTable(HashId,lists:keysort(1,maps:to_list(NewFingerTable)),160,[]), % update finger table by making a new one
       chordActor(NewFingerTable,DataTable,HashId);
 
     {find,Key,SearchersPID}-> % fix so that it is stored in proper node given key
@@ -51,6 +50,7 @@ decimalShaHash(N)->
 binary:decode_unsigned(crypto:hash(sha,N)). % use sha 1 like doc says max size is unsigned 160 bit value = 1461501637330902918203684832716283019655932542976
 
 simulate(NumberOfActors,NumberOfRequests)->
+  io:format("2^0 = ~w",[round(math:pow(2,1-1))]),
   io:format("NUM OF REQ:~w~n",[NumberOfRequests]),
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = maps:to_list(MapOfActors),
