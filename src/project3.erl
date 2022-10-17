@@ -49,7 +49,7 @@ chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of 
 decimalShaHash(N)->
 binary:decode_unsigned(crypto:hash(sha,N)). % use sha 1 like doc says max size is unsigned 160 bit value = 1461501637330902918203684832716283019655932542976
 
-simulate(NumberOfActors,NumberOfRequests)->
+simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor must make that many
   io:format("2^0 = ~w",[round(math:pow(2,1-1))]),
   io:format("NUM OF REQ:~w~n",[NumberOfRequests]),
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
