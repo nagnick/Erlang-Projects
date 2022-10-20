@@ -1,7 +1,7 @@
 -module(project3).
 -author("nicol").
 -import(crypto,[hash/2]).
--export([simulate/2,chordActor/3,actorKiller/1]).
+-export([simulate/2,chordActor/3,actorKiller/1,createCollisionFreeData/1]).
 
 findGEValue(SortedMapList,MinValue)-> % function searches the list to find the first value grater than or equal to MinValue
   findGEValue(SortedMapList,MinValue,SortedMapList).% saves original list in case of a wrap around ex min value is larger than largest
@@ -77,3 +77,26 @@ spawnMultipleActors(0,MapOfPid)->
 spawnMultipleActors(NumberOfActorsToSpawn,MapOfPid)->
   NewMap = maps:put(decimalShaHash([NumberOfActorsToSpawn]),spawn(project3,chordActor,[[],#{},decimalShaHash([NumberOfActorsToSpawn])]), MapOfPid),
   spawnMultipleActors( NumberOfActorsToSpawn-1,NewMap).
+
+createCollisionFreeData(NumberOfEntries)-> % anything more than 4000000 is slow
+  createCollisionFreeData(NumberOfEntries,3000, #{}).
+
+createCollisionFreeData(0,_, MapOfEntries)->
+  TupleList = maps:to_list(MapOfEntries),
+  [Value || {_,Value} <- TupleList];
+createCollisionFreeData(NumberOfEntries,NextStringNumber, MapOfEntries)->
+  Size = maps:size(MapOfEntries),
+  String = numberToString(NextStringNumber),
+  NewMap = maps:put(decimalShaHash(String),String,MapOfEntries), % if duplicate just rewrites value for key
+  NewSize = maps:size(NewMap),
+  if
+    NewSize == Size -> % new value generated already has it hash in map so overwrite value map has not grown still need to make same amount of data
+      createCollisionFreeData(NumberOfEntries,NextStringNumber+1,NewMap);
+    true-> % new value increased map size one lees data entry to make
+      createCollisionFreeData(NumberOfEntries-1,NextStringNumber+1,NewMap)
+  end.
+
+numberToString(N) when N < 94 -> % 94 possible chars
+  [(N+33)]; % 33 = '!' 33 + 93 = 126 = '~' last acceptable char to us
+numberToString(N) when N >= 94->
+  numberToString(N div 94) ++ numberToString(N rem 94).
