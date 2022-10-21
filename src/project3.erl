@@ -1,7 +1,7 @@
 -module(project3).
 -author("nicolas").
 -import(crypto,[hash/2]).
--export([simulate/2,chordActor/3,actorKiller/1,createCollisionFreeData/1,createActorSearchList/2]).
+-export([simulate/2,chordActor/2,actorKiller/1,createCollisionFreeData/1,createActorSearchList/2,fillWithData/2]).
 
 findGEValue(SortedMapList,MinValue)-> % function searches the list to find the first value grater than or equal to MinValue
   findGEValue(SortedMapList,MinValue,SortedMapList).% saves original list in case of a wrap around ex min value is larger than largest
@@ -25,26 +25,61 @@ createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fin
   Hash = findGEValue(SortedListOfPids,NextEntryMinHash), %% get smallest actor hash to fill current spot
   createFingerTable(ActorHash,SortedListOfPids,I-1,[Hash | FingerTable]).
 
-chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of actor to run
-  io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
+chordActor(SuperVisor,HashId)-> % startingPoint of actor
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
       NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
-      chordActor(NewFingerTable,DataTable,HashId);
-    {addActor,Pid,Id}->
+      chordActor(SuperVisor,NewFingerTable,HashId) % fingerTable is filled with {hashID,PID} tuples of the actors in network
+  end.
+
+chordActor(SuperVisor, FingerTable,HashId)-> % second step of actor
+  receive
+  %add searchSet receive to start the searching process
+    {searchSet,SearchSetList}->
+      chordActor(SuperVisor, FingerTable,#{},HashId,SearchSetList,0)
+  end.
+
+chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum)-> %final main actor
+ % io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
+%%  if
+%%    SearchSetList == []->
+%%      SuperVisor ! {done,self(), HopsRunningSum}; % notify supervisor all searches complete
+%%    true ->
+%%      %% send message to find hd of searchSetLIst
+%%      findGEValue(FingerTable,hd(SearchSetList)) ! {find,decimalShaHash(hd(SearchSetList)),self()} % fix findGEV expects sorted mapList
+%%  end,
+  receive
+    {addActor,Pid,Id}-> % done
       NewFingerTable = maps:put(Id,Pid,FingerTable),
       createFingerTable(HashId,lists:keysort(1,maps:to_list(NewFingerTable)),160,[]), % update finger table by making a new one
-      chordActor(NewFingerTable,DataTable,HashId);
-    %add searchSet receive to start the searching process
+      chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,HopsRunningSum);
+    {found,Value,Hops}-> % done
+      NewSearchSetList = SearchSetList -- [Value],% don't need to search for anymore
+      chordActor(SuperVisor, FingerTable,DataTable,HashId,NewSearchSetList,HopsRunningSum+Hops);
 
-    {find,Key,SearchersPID}-> % fix so that it is stored in proper node given key
-      %returns {badKey,Key} if not in map
-      SearchersPID ! maps:get(Key,FingerTable), % fix need to message those actors(or tell you to keep looking at next actor) unless in me then return my data
-      chordActor(FingerTable,DataTable,HashId);
-    {addKeyValue,Key,Value}-> % fix
-      NewMap = maps:put(Key,Value,DataTable),
-      chordActor(FingerTable,NewMap,HashId)
+    {find,Key,SearchersPID}-> % done?
+      % check finger table
+      {ToAskHash,ToAskPID} = findGEValue(FingerTable,Key), % returns tuple {HAshKey, PID}
+      if
+        HashId == ToAskHash -> % found! i must have the data in my dataTable
+          SearchersPID ! maps:get(Key,DataTable); %returns {badKey,Key} if not in map to actor searching
+        true -> % not in my data table ask next highest node still less than
+          ToAskPID ! {find,Key,SearchersPID}
+      end,
+      chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum);
+
+    {addKeyValue,Key,Value}-> % done?
+      {ToAskHash,ToAskPID} = findGEValue(FingerTable,Key), % returns tuple {HAshKey, PID}
+      if
+        HashId == ToAskHash -> % i must put the data in my dataTable
+          NewMap = maps:put(Key,Value,DataTable);
+        true -> % not for my data table ask next highest node still less than
+          ToAskPID ! {addKeyValue,Key,Value},
+          SuperVisor ! {dataInserted,Value}, % tell supervisor data is inserted so it knows when to start simulation
+          NewMap = DataTable
+      end,
+      chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,HopsRunningSum)
   end.
 
 decimalShaHash(N)->
@@ -55,11 +90,14 @@ simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
   init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
-  start(ListOfActors,createCollisionFreeData(40000),150),
+  Data = createCollisionFreeData(400),
+  start(ListOfActors,Data,150),
+  fillWithData(ListOfActors,Data),
   hopSum(ListOfActors,0,NumberOfActors),
   actorKiller(ListOfActors).
 
 init([],_)-> % sends actors everything they need to initialize finger table and data map
+  io:format("FIngerTables built~n"),
   ok;
 init(ListOfActors,MapOfActors)->
   PID = hd(ListOfActors),
@@ -67,19 +105,38 @@ init(ListOfActors,MapOfActors)->
   init(tl(ListOfActors),MapOfActors).
 
 start([],_,_)-> % gives actors a search set to start looking up data
+  io:format("SearchSets Distributed~n"),
   ok;
 start(ListOfActors,CollisionFreeDataSet, SearchSetSize)->
   PID = hd(ListOfActors),
   PID !  {searchSet,createActorSearchList(CollisionFreeDataSet,SearchSetSize)},
-  start(ListOfActors,CollisionFreeDataSet,SearchSetSize).
+  start(tl(ListOfActors),CollisionFreeDataSet,SearchSetSize).
+
+fillWithData(_,[])-> % gives actors a search set to start looking up data
+  io:format("Actor data tables filled~n"),
+  ok;
+fillWithData(ListOfActors,CollisionFreeDataSet)->
+  PID = hd(ListOfActors),
+  PID ! {addKeyValue,decimalShaHash(hd(CollisionFreeDataSet)),hd(CollisionFreeDataSet)},
+  receive
+    {dataInserted,Value}->
+      fillWithData(ListOfActors,CollisionFreeDataSet -- [Value])
+  end.
 
 hopSum([],RunningSum,ActorCount)->
   io:format("AverageNumberOfHops:~p~n",[(RunningSum/ActorCount)]);
 hopSum(ListOfActors,RunningSum,ActorCount)->
   receive
-    {done,ActorPID} ->
+    {done,ActorPID,TotalHops} -> % fix if actor already exited don't sum
+      Length1 = length(ListOfActors),
       PIDs = ListOfActors -- [ActorPID],
-      hopSum(PIDs,RunningSum,ActorCount)
+      Length2 = length(PIDs),
+      if
+        Length1  == Length2 -> % repeat message from actor
+          hopSum(PIDs,RunningSum,ActorCount);
+        true -> % new message from actor so add to running hops sum
+          hopSum(PIDs,RunningSum + TotalHops,ActorCount)
+      end
   end.
 
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
@@ -92,7 +149,7 @@ actorKiller(ListOfActors)->
 spawnMultipleActors(0,MapOfPid)->
   MapOfPid;
 spawnMultipleActors(NumberOfActorsToSpawn,MapOfPid)->
-  NewMap = maps:put(decimalShaHash([NumberOfActorsToSpawn]),spawn(project3,chordActor,[[],#{},decimalShaHash([NumberOfActorsToSpawn])]), MapOfPid),
+  NewMap = maps:put(decimalShaHash([NumberOfActorsToSpawn]),spawn(project3,chordActor,[self(),decimalShaHash([NumberOfActorsToSpawn])]), MapOfPid),
   spawnMultipleActors( NumberOfActorsToSpawn-1,NewMap).
 
 createActorSearchList(ListOfData,SizeOfSetReturned)-> % takes in list of collisionFreeData and returns a random set for actors to lookup of given size
