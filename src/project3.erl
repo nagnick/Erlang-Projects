@@ -1,7 +1,7 @@
 -module(project3).
--author("nicol").
+-author("nicolas").
 -import(crypto,[hash/2]).
--export([simulate/2,chordActor/3,actorKiller/1,createCollisionFreeData/1]).
+-export([simulate/2,chordActor/3,actorKiller/1,createCollisionFreeData/1,createActorSearchList/2]).
 
 findGEValue(SortedMapList,MinValue)-> % function searches the list to find the first value grater than or equal to MinValue
   findGEValue(SortedMapList,MinValue,SortedMapList).% saves original list in case of a wrap around ex min value is larger than largest
@@ -36,6 +36,7 @@ chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of 
       NewFingerTable = maps:put(Id,Pid,FingerTable),
       createFingerTable(HashId,lists:keysort(1,maps:to_list(NewFingerTable)),160,[]), % update finger table by making a new one
       chordActor(NewFingerTable,DataTable,HashId);
+    %add searchSet receive to start the searching process
 
     {find,Key,SearchersPID}-> % fix so that it is stored in proper node given key
       %returns {badKey,Key} if not in map
@@ -49,22 +50,38 @@ chordActor(FingerTable,DataTable,HashId)-> %starter actor decides which type of 
 decimalShaHash(N)->
 binary:decode_unsigned(crypto:hash(sha,N)). % use sha 1 like doc says max size is unsigned 160 bit value = 1461501637330902918203684832716283019655932542976
 
-simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor must make that many
-  io:format("2^0 = ~w",[round(math:pow(2,1-1))]),
+simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor must make that many SuperVisor of network will get responses from actors
   io:format("NUM OF REQ:~w~n",[NumberOfRequests]),
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
-  ListOfActors = maps:to_list(MapOfActors),
-  init(ListOfActors,MapOfActors).
+  ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
+  init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
+  start(ListOfActors,createCollisionFreeData(40000),150),
+  hopSum(ListOfActors,0,NumberOfActors),
+  actorKiller(ListOfActors).
 
-init([],_)->
+init([],_)-> % sends actors everything they need to initialize finger table and data map
   ok;
 init(ListOfActors,MapOfActors)->
-  {_,PID} = hd(ListOfActors),
+  PID = hd(ListOfActors),
   PID !  {init,MapOfActors},
   init(tl(ListOfActors),MapOfActors).
 
-%%chordClient(ListOfActors,Action,Data)->
-%%  .
+start([],_,_)-> % gives actors a search set to start looking up data
+  ok;
+start(ListOfActors,CollisionFreeDataSet, SearchSetSize)->
+  PID = hd(ListOfActors),
+  PID !  {searchSet,createActorSearchList(CollisionFreeDataSet,SearchSetSize)},
+  start(ListOfActors,CollisionFreeDataSet,SearchSetSize).
+
+hopSum([],RunningSum,ActorCount)->
+  io:format("AverageNumberOfHops:~p~n",[(RunningSum/ActorCount)]);
+hopSum(ListOfActors,RunningSum,ActorCount)->
+  receive
+    {done,ActorPID} ->
+      PIDs = ListOfActors -- [ActorPID],
+      hopSum(PIDs,RunningSum,ActorCount)
+  end.
+
 actorKiller([])-> %Tell actors to kill themselves the swarm has converged
   ok;
 actorKiller(ListOfActors)->
@@ -78,10 +95,20 @@ spawnMultipleActors(NumberOfActorsToSpawn,MapOfPid)->
   NewMap = maps:put(decimalShaHash([NumberOfActorsToSpawn]),spawn(project3,chordActor,[[],#{},decimalShaHash([NumberOfActorsToSpawn])]), MapOfPid),
   spawnMultipleActors( NumberOfActorsToSpawn-1,NewMap).
 
+createActorSearchList(ListOfData,SizeOfSetReturned)-> % takes in list of collisionFreeData and returns a random set for actors to lookup of given size
+  createActorSearchList(ListOfData,length(ListOfData),SizeOfSetReturned,[]).
+
+createActorSearchList(_,_,0,ReturnedList)->
+  ReturnedList;
+createActorSearchList(ListOfData,SizeOfList,SizeOfSetReturned,ReturnedList)->
+  Index = rand:uniform(SizeOfList),
+  createActorSearchList(ListOfData,SizeOfList,SizeOfSetReturned-1,[lists:nth(Index,ListOfData) | ReturnedList]).
+
+
 createCollisionFreeData(NumberOfEntries)-> % anything more than 4000000 is slow
   createCollisionFreeData(NumberOfEntries,3000, #{}).
 
-createCollisionFreeData(0,_, MapOfEntries)->
+createCollisionFreeData(0,_, MapOfEntries)-> % creates a set of strings with hashes that do not collide
   TupleList = maps:to_list(MapOfEntries),
   [Value || {_,Value} <- TupleList];
 createCollisionFreeData(NumberOfEntries,NextStringNumber, MapOfEntries)->
