@@ -70,7 +70,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum
       chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum);
 
     {addKeyValue,Key,Value}-> % done?
-      {ToAskHash,ToAskPID} = findGEValue(FingerTable,Key), % returns tuple {HAshKey, PID}
+      {ToAskHash,ToAskPID} = findGEValue(FingerTable,Key), % returns tuple {HAshKey, PID} %%%%%% BROKEN DOES NOT WORK AT ALLLLLLL
       if
         HashId == ToAskHash -> % i must put the data in my dataTable
           NewMap = maps:put(Key,Value,DataTable);
@@ -116,7 +116,7 @@ fillWithData(_,[])-> % gives actors a search set to start looking up data
   io:format("Actor data tables filled~n"),
   ok;
 fillWithData(ListOfActors,CollisionFreeDataSet)->
-  PID = hd(ListOfActors),
+  PID = lists:nth(rand:uniform(length(ListOfActors)),ListOfActors), % insert starting at random actors
   PID ! {addKeyValue,decimalShaHash(hd(CollisionFreeDataSet)),hd(CollisionFreeDataSet)},
   receive
     {dataInserted,Value}->
