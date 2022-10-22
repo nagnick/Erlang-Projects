@@ -81,15 +81,16 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
  % PID ! {find,decimalShaHash(hd(SearchSetList)),self()}, % fix findGEV expects sorted mapList
 %%  end,
   receive
-    {addActor,Pid,Id}-> % Don't need / BROKEN
+    {addActor,Pid,Id}-> % Done
       NewMapOfPids = maps:put(Id,Pid,MapOfPids),
       NewFingerTable = lists:keysort(1,createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[])), % update finger table by making a new one
       chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
-    {found,Value,Hops}-> % done
+
+    {found,Value,Hops}-> % Broken?
       NewSearchSetList = SearchSetList -- [Value],% don't need to search for anymore
       chordActor(SuperVisor, FingerTable,DataTable,HashId,NewSearchSetList,MapOfPids,HopsRunningSum+Hops);
 
-    {find,Key,SearchersPID}-> % done?
+    {find,Key,SearchersPID}-> % Broken?
       % check finger table
       {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HAshKey, PID}
       if
@@ -101,8 +102,8 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       end,
       chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {addKeyValue,Key,Value}-> % done?
-      {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HAshKey, PID} %%%%%% BROKEN DOES NOT WORK AT ALLLLLLL
+    {addKeyValue,Key,Value}-> % Done
+      {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HashKey, PID}
       if
         ToAskHash >= Key  -> % Is next actor in finger table a valid choice? or is it trying to loop around so went higher
           if
@@ -162,7 +163,7 @@ fillWithData(ListOfActors,CollisionFreeDataSet)->
       fillWithData(ListOfActors,CollisionFreeDataSet -- [Value])
   end.
 
-hopSum([],RunningSum,ActorCount)->
+hopSum([],RunningSum,ActorCount)-> % broken until actor complete
   io:format("AverageNumberOfHops:~p~n",[(RunningSum/ActorCount)]);
 hopSum(ListOfActors,RunningSum,ActorCount)->
   receive
