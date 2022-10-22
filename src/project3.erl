@@ -20,16 +20,30 @@ findSuccessor(SortedMapList,MinValue,Original)->
 findActorToAsk(FingerTable,Key)-> % function searches the list to find the first value grater than or equal to MinValue
   findActorToAsk(FingerTable,Key,hd(FingerTable)).% saves original list in case of a wrap around ex min value is larger than largest
 % value in list so return min value of list aka head
-findActorToAsk([],_,LastValue)-> % if you get to the end of the list return first item in list
-  LastValue;
-findActorToAsk(FingerTable,Key,LastValue)->
+findActorToAsk([],_,LastHighestValue)-> % if you get to the end of the list return first item in list
+  LastHighestValue;
+findActorToAsk(FingerTable,Key,LastHighestValue)->
   {ActorHash,_} = hd(FingerTable),
   if
     ActorHash < Key -> % find actor with a large hash that is still less than key looking for
       findActorToAsk(tl(FingerTable),Key,hd(FingerTable));
     true -> % this item goes to far return last actor that was less than key
-      LastValue
+      LastHighestValue
   end.
+%%findActorToAsk(FingerTable,Key,LastHighestValue)->
+%%  {ActorHash,_} = hd(FingerTable),
+%%  if
+%%    ActorHash < Key -> % find actor with a large hash that is still less than key looking for
+%%      {LastHash,_} = LastHighestValue,
+%%      if
+%%        LastHash > ActorHash->
+%%          findActorToAsk(tl(FingerTable),Key,LastHighestValue);% keep old lastHighestHash as it is higher
+%%        true->
+%%          findActorToAsk(tl(FingerTable),Key,hd(FingerTable)) % use new value as it is higher
+%%      end;
+%%    true -> % this item goes to far return last actor that was less than key
+%%      LastHighestValue
+%%  end.
 createFingerTable(_,_,0,FingerTable) ->%List max size is 160
   FingerTable; % table is a list of {hashvalue,PID}
 createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fingerTable and current index being filled
@@ -42,19 +56,21 @@ chordActor(SuperVisor,HashId)-> % startingPoint of actor
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
-      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
-      io:format("~w~n",[NewFingerTable]),
-      chordActor(SuperVisor,NewFingerTable,HashId) % fingerTable is filled with {hashID,PID} tuples of the actors in network
+      NewFingerTable = lists:keysort(1,createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[])), % initial FingerTable is empty and start filling fingerTable at index 1
+      % finger table is sorted so that the search for next in line actors is most efficient
+      %io:format("~w~n",[NewFingerTable]),
+      chordActor(SuperVisor,NewFingerTable,HashId,MapOfPids) % fingerTable is filled with {hashID,PID} tuples of the actors in network
+    % carries map of PIDs to build future fingerTables from
   end.
 
-chordActor(SuperVisor, FingerTable,HashId)-> % second step of actor
+chordActor(SuperVisor, FingerTable,HashId,MapOfPids)-> % second step of actor
   receive
   %add searchSet receive to start the searching process
     {searchSet,SearchSetList}->
-      chordActor(SuperVisor, FingerTable,#{},HashId,SearchSetList,0)
+      chordActor(SuperVisor, FingerTable,#{},HashId,SearchSetList,MapOfPids,0)
   end.
 
-chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum)-> %final main actor
+chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, HopsRunningSum)-> %final main actor
   %io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
 %%  if
 %%    SearchSetList == []->
@@ -65,13 +81,13 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum
  % PID ! {find,decimalShaHash(hd(SearchSetList)),self()}, % fix findGEV expects sorted mapList
 %%  end,
   receive
-    {addActor,Pid,Id}-> % done
-      NewFingerTable = maps:put(Id,Pid,FingerTable),
-      createFingerTable(HashId,lists:keysort(1,maps:to_list(NewFingerTable)),160,[]), % update finger table by making a new one
-      chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,HopsRunningSum);
+    {addActor,Pid,Id}-> % Don't need / BROKEN
+      NewMapOfPids = maps:put(Id,Pid,MapOfPids),
+      NewFingerTable = lists:keysort(1,createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[])), % update finger table by making a new one
+      chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
     {found,Value,Hops}-> % done
       NewSearchSetList = SearchSetList -- [Value],% don't need to search for anymore
-      chordActor(SuperVisor, FingerTable,DataTable,HashId,NewSearchSetList,HopsRunningSum+Hops);
+      chordActor(SuperVisor, FingerTable,DataTable,HashId,NewSearchSetList,MapOfPids,HopsRunningSum+Hops);
 
     {find,Key,SearchersPID}-> % done?
       % check finger table
@@ -83,19 +99,25 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum
         true -> % not in my data table ask next highest node still less than
           ToAskPID ! {find,Key,SearchersPID}
       end,
-      chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,HopsRunningSum);
+      chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
     {addKeyValue,Key,Value}-> % done?
       {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HAshKey, PID} %%%%%% BROKEN DOES NOT WORK AT ALLLLLLL
       if
-        HashId >= Key, HashId >= ToAskHash  -> % i must put the data in my dataTable I am best choice
+        ToAskHash >= Key  -> % Is next actor in finger table a valid choice? or is it trying to loop around so went higher
+          if
+            HashId >= ToAskHash -> % looped around to beginning so I am still best choice
+              NewMap = maps:put(Key,Value,DataTable),
+              SuperVisor ! {dataInserted,Value}; % tell supervisor data is inserted so it knows when to start simulation;
+            true -> % next actor is best choice
+              ToAskPID ! {addKeyValue,Key,Value},
+              NewMap = DataTable
+          end;
+        true -> % next actor too far up insert in me
           NewMap = maps:put(Key,Value,DataTable),
-          SuperVisor ! {dataInserted,Value}; % tell supervisor data is inserted so it knows when to start simulation;
-        true -> % not for my data table ask next highest node still less than
-          ToAskPID ! {addKeyValue,Key,Value},
-          NewMap = DataTable
+          SuperVisor ! {dataInserted,Value} % tell supervisor data is inserted so it knows when to start simulation;
       end,
-      chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,HopsRunningSum)
+      chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum)
   end.
 
 decimalShaHash(N)->
@@ -106,14 +128,14 @@ simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
   init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
-  Data = createCollisionFreeData(40),
+  Data = createCollisionFreeData(400),
   start(ListOfActors,Data,10),
   fillWithData(ListOfActors,Data),
   hopSum(ListOfActors,0,NumberOfActors),
   actorKiller(ListOfActors).
 
 init([],_)-> % sends actors everything they need to initialize finger table and data map
-  io:format("FIngerTables built~n"),
+  io:format("FingerTables built~n"),
   ok;
 init(ListOfActors,MapOfActors)->
   PID = hd(ListOfActors),
@@ -136,6 +158,7 @@ fillWithData(ListOfActors,CollisionFreeDataSet)->
   PID ! {addKeyValue,decimalShaHash(hd(CollisionFreeDataSet)),hd(CollisionFreeDataSet)},
   receive
     {dataInserted,Value}->
+      %io:format("value Entered successfully"),
       fillWithData(ListOfActors,CollisionFreeDataSet -- [Value])
   end.
 
