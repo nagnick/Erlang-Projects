@@ -1,3 +1,17 @@
-Team members
-What is working
-What is the largest network you managed to deal with
+Team members:
+Nicolas Garcia
+What is working:
+I have created a chord network. Which once initialized and filled with random data can be used to test average number of
+hops per search. To test average number of hops I also distribute random keys for each actor to search for. Once
+searching is completed by all actors the network is shutdown and average number of hops is outputted.
+
+To run my chord simulation use the following command: project3:simulate(NumberOfNodes,NumberOfSearchesPerNode).
+
+Also to note is that the total number of data entries is constant across network constructions set at 40000.
+Conclusion: The network is O(log n) where n is the number of nodes in the network. I did lots of testing and determined
+my implementation is logarithmic but has a sizeable constant multiple which is dropped by big O notation.
+
+What is the largest network you managed to deal with:
+The largest simulation I was able to run was 20,000 nodes each asking 1 search query. This was the limit due to system
+memory limits. Each actor requires a lot of data to store their finger tables which in my implementations holds 160
+entries to match the research paper implementation since sha 1 has 160 bits of output.

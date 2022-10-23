@@ -17,11 +17,11 @@ findSuccessor(SortedMapList,MinValue,Original)->
       findSuccessor(tl(SortedMapList),MinValue,Original)
   end.
 
-findPredecessor(FingerTable,Key)-> % function searches the list to find the first value grater than or equal to MinValue
+findPredecessor(FingerTable,Key)-> % function searches the list to find the biggest value less than or equal to MinValue
   findPredecessor(FingerTable,Key,hd(FingerTable)).% No predecessor so return successor needs to make another round in loop
 % value in list so return min value of list aka head
 findPredecessor([],_, ImmediateSuccessor)-> % if you get to the end of the list return first item in list
-  ImmediateSuccessor;% fix so if value is
+  ImmediateSuccessor;
 findPredecessor(FingerTable,Key,LastBestValue)->
   {ActorHash,_} = hd(FingerTable),
   if
@@ -32,8 +32,8 @@ findPredecessor(FingerTable,Key,LastBestValue)->
         true -> % necessary for max value insert to work aka key is greater than largest actor hash
           findPredecessor(tl(FingerTable),Key,LastBestValue)
       end;
-    true -> % this item goes to far return last actor that was less than key
-      LastBestValue
+    true -> % this item goes to far return last actor that was less than key but keep going maybe better actor at end of finger table
+      findPredecessor(tl(FingerTable),Key,LastBestValue)
   end.
 
 createFingerTable(_,_,0,FingerTable) ->%List max size is 160
@@ -49,8 +49,7 @@ chordActor(SuperVisor,HashId)-> % startingPoint of actor
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
       NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
-      % finger table is sorted so that the search for next in line actors is most efficient
-      %io:format("~w~n",[NewFingerTable]),
+      % Map of PIDs is sorted so that the search for next in line actors is most efficient
       chordActor(SuperVisor,NewFingerTable,HashId,MapOfPids) % fingerTable is filled with {hashID,PID} tuples of the actors in network
     % carries map of PIDs to build future fingerTables from
   end.
@@ -80,21 +79,21 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       end,
       chordActor(SuperVisor, FingerTable,DataTable,HashId,NewSearchSetList,MapOfPids,HopsRunningSum+Hops);
 
-    {addActor,Pid,Id}-> % Done
+    {addActor,Pid,Id}->
       NewMapOfPids = maps:put(Id,Pid,MapOfPids),
       NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[]), % update finger table by making a new one
       chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
 
-    {found,Key,SearchersPID,Hops}-> % Work In Progress
+    {found,Key,SearchersPID,Hops}->
       Result = maps:get(Key,DataTable),
-      SearchersPID ! {queryResult,Result,Hops},
+      SearchersPID ! {queryResult,Result,Hops+1},
       chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {find,Key,SearchersPID,Hops}-> % Work in Progress
+    {find,Key,SearchersPID,Hops}->
       {ToAskHash,ToAskPID} = findPredecessor(FingerTable,Key), % returns tuple {HashKey, PID}
       InMyDataTable = checkActorDataTable(DataTable,Key),
       if
-        InMyDataTable-> % if in my data table done return value
+        InMyDataTable == true-> % if in my data table done return value
           SearchersPID ! {queryResult,maps:get(Key,DataTable),Hops},
           NewMap = DataTable;
         HashId >= ToAskHash-> % looped to front
@@ -105,7 +104,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
             ToAskHash >= Key-> % min value in min node
               ToAskPID ! {found,Key,SearchersPID,Hops+1},
               NewMap = DataTable;
-            true -> % haven't got to best spot yet
+            true -> % haven't got to best spot yet loop around
               ToAskPID ! {find,Key,SearchersPID,Hops+1},
               NewMap = DataTable
           end;
@@ -122,13 +121,13 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       end,
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {finalAddKeyValue,Key,Value} -> % I am node that should hold key, value pair % work in progress
+    {finalAddKeyValue,Key,Value} -> % I am node that should hold key, value pair
       NewMap = maps:put(Key,Value,DataTable),
       %io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
       SuperVisor ! {dataInserted,Value}, % tell supervisor data is inserted so it knows when to start simulation;
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {addKeyValue,Key,Value}-> % work in progress
+    {addKeyValue,Key,Value}->
       {ToAskHash,ToAskPID} = findPredecessor(FingerTable,Key), % returns tuple {HashKey, PID}
       if
         HashId >= ToAskHash-> % looped to front
