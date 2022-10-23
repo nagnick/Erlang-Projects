@@ -17,33 +17,6 @@ findSuccessor(SortedMapList,MinValue,Original)->
       findSuccessor(tl(SortedMapList),MinValue,Original)
   end.
 
-findActorToAsk(FingerTable,Key)-> % function searches the list to find the first value grater than or equal to MinValue
-  findActorToAsk(FingerTable,Key,hd(FingerTable)).% saves original list in case of a wrap around ex min value is larger than largest
-% value in list so return min value of list aka head
-findActorToAsk([],_,LastHighestValue)-> % if you get to the end of the list return first item in list
-  LastHighestValue;
-findActorToAsk(FingerTable,Key,LastHighestValue)->
-  {ActorHash,_} = hd(FingerTable),
-  if
-    ActorHash < Key -> % find actor with a large hash that is still less than key looking for
-      findActorToAsk(tl(FingerTable),Key,hd(FingerTable));
-    true -> % this item goes to far return last actor that was less than key
-      LastHighestValue
-  end.
-%%findActorToAsk(FingerTable,Key,LastHighestValue)->
-%%  {ActorHash,_} = hd(FingerTable),
-%%  if
-%%    ActorHash < Key -> % find actor with a large hash that is still less than key looking for
-%%      {LastHash,_} = LastHighestValue,
-%%      if
-%%        LastHash > ActorHash->
-%%          findActorToAsk(tl(FingerTable),Key,LastHighestValue);% keep old lastHighestHash as it is higher
-%%        true->
-%%          findActorToAsk(tl(FingerTable),Key,hd(FingerTable)) % use new value as it is higher
-%%      end;
-%%    true -> % this item goes to far return last actor that was less than key
-%%      LastHighestValue
-%%  end.
 createFingerTable(_,_,0,FingerTable) ->%List max size is 160
   FingerTable; % table is a list of {hashvalue,PID}
 createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fingerTable and current index being filled
@@ -64,6 +37,7 @@ chordActor(SuperVisor,HashId)-> % startingPoint of actor
   end.
 
 chordActor(SuperVisor, FingerTable,HashId,MapOfPids)-> % second step of actor
+  io:format("ActorHashID:~w~p~n",[HashId,self()]),
   receive
   %add searchSet receive to start the searching process
     {searchSet,SearchSetList}->
@@ -71,7 +45,7 @@ chordActor(SuperVisor, FingerTable,HashId,MapOfPids)-> % second step of actor
   end.
 
 chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, HopsRunningSum)-> %final main actor
-  %io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
+%%  io:format("ActorHashID:~w~p~n ~w~n~w~n",[HashId,self(),FingerTable,length(FingerTable)]),
 %%  if
 %%    SearchSetList == []->
 %%      SuperVisor ! {done,self(), HopsRunningSum}; % notify supervisor all searches complete
@@ -92,7 +66,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
 
     {find,Key,SearchersPID}-> % Broken?
       % check finger table
-      {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HAshKey, PID}
+      {ToAskHash,ToAskPID} = findSuccessor(FingerTable,Key), % returns tuple {HAshKey, PID}
       if
         HashId == ToAskHash -> % found! i must have the data in my dataTable
           io:format("FOund~n"),
@@ -101,27 +75,36 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
           ToAskPID ! {find,Key,SearchersPID}
       end,
       chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
-    {minNodeAddKeyValue,Key,Value} -> % I am smallest node and I hold all the too big key value pairs % work in progress
+    {finalAddKeyValue,Key,Value} -> % I am smallest node and I hold all the too big key value pairs % work in progress
       NewMap = maps:put(Key,Value,DataTable),
       io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
       SuperVisor ! {dataInserted,Value}, % tell supervisor data is inserted so it knows when to start simulation;
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
+
     {addKeyValue,Key,Value}-> % work in progress
-      {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HashKey, PID}
+      {ToAskHash,ToAskPID} = findSuccessor(FingerTable,Key), % returns tuple {HashKey, PID}
       if
-        ToAskHash >= HashId-> % normal increase in ring
+        HashId >= ToAskHash-> % looped to front
           if
-            HashId >= Key -> % next node goes too far I am best choice
-              NewMap = maps:put(Key,Value,DataTable),
-              io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
-              SuperVisor ! {dataInserted,Value}; % tell supervisor data is inserted so it knows when to start simulation;
-            true -> % next actor is best choice
+            Key >= ToAskHash, Key >= HashId ->
+              ToAskPID ! {finalAddKeyValue,Key,Value},
+              NewMap = DataTable;
+            ToAskHash >= Key->
+              ToAskPID ! {finalAddKeyValue,Key,Value},
+              NewMap = DataTable;
+            true -> % haven't passed best spot
               ToAskPID ! {addKeyValue,Key,Value},
               NewMap = DataTable
           end;
-        true -> % next actor is bellow me wrapped around special case min node gets key value pair too big to hold
-              ToAskPID ! {minNodeAddKeyValue,Key,Value},
+        true -> % increasing but don't know if passed optimal node so keep going until wrap around
+          if
+            Key >= HashId, ToAskHash >= Key-> % found best node
+              ToAskPID ! {finalAddKeyValue,Key,Value},
+              NewMap = DataTable;
+            true -> % passed best spot
+              ToAskPID ! {addKeyValue,Key,Value},
               NewMap = DataTable
+          end
       end,
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum)
   end.
