@@ -17,6 +17,20 @@ findSuccessor(SortedMapList,MinValue,Original)->
       findSuccessor(tl(SortedMapList),MinValue,Original)
   end.
 
+%%findActorToAsk(FingerTable,Key)-> % function searches the list to find the first value grater than or equal to MinValue
+%%  findActorToAsk(FingerTable,Key,hd(FingerTable)).% saves original list in case of a wrap around ex min value is larger than largest
+%%% value in list so return min value of list aka head
+%%findActorToAsk([],_,LastHighestValue)-> % if you get to the end of the list return first item in list
+%%  LastHighestValue;
+%%findActorToAsk(FingerTable,Key,LastHighestValue)->
+%%  {ActorHash,_} = hd(FingerTable),
+%%  if
+%%    ActorHash < Key -> % find actor with a large hash that is still less than key looking for
+%%      findActorToAsk(tl(FingerTable),Key,hd(FingerTable));
+%%    true -> % this item goes to far return last actor that was less than key
+%%      LastHighestValue
+%%  end.
+
 createFingerTable(_,_,0,FingerTable) ->%List max size is 160
   FingerTable; % table is a list of {hashvalue,PID}
 createFingerTable(ActorHash,SortedListOfPids,I,FingerTable)-> % I is size of fingerTable and current index being filled
@@ -29,7 +43,7 @@ chordActor(SuperVisor,HashId)-> % startingPoint of actor
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
-      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
+      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),140,[]), % initial FingerTable is empty and start filling fingerTable at index 1
       % finger table is sorted so that the search for next in line actors is most efficient
       %io:format("~w~n",[NewFingerTable]),
       chordActor(SuperVisor,NewFingerTable,HashId,MapOfPids) % fingerTable is filled with {hashID,PID} tuples of the actors in network
@@ -57,7 +71,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
   receive
     {addActor,Pid,Id}-> % Done
       NewMapOfPids = maps:put(Id,Pid,MapOfPids),
-      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[]), % update finger table by making a new one
+      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),140,[]), % update finger table by making a new one
       chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
 
     {found,Value,Hops}-> % Broken?
@@ -99,7 +113,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
         true -> % increasing but don't know if passed optimal node so keep going until wrap around
           if
             Key > HashId, ToAskHash >= Key-> % found best node
-              io:format("Ask ~p from ~p",[ToAskPID,self()]),
+              %io:format("Ask ~p from ~p ~n~w~n",[ToAskPID,self(),FingerTable]),
               ToAskPID ! {finalAddKeyValue,Key,Value},
               NewMap = DataTable;
             true -> % passed best spot
