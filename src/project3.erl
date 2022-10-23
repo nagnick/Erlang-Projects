@@ -86,19 +86,20 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       if
         HashId >= ToAskHash-> % looped to front
           if
-            Key >= ToAskHash, Key >= HashId ->
+            Key > ToAskHash, Key > HashId -> % value bigger than biggest node so insert in smallest node
               ToAskPID ! {finalAddKeyValue,Key,Value},
               NewMap = DataTable;
-            ToAskHash >= Key->
+            ToAskHash >= Key-> % min value in min node
               ToAskPID ! {finalAddKeyValue,Key,Value},
               NewMap = DataTable;
-            true -> % haven't passed best spot
+            true -> % haven't got to best spot yet
               ToAskPID ! {addKeyValue,Key,Value},
               NewMap = DataTable
           end;
         true -> % increasing but don't know if passed optimal node so keep going until wrap around
           if
-            Key >= HashId, ToAskHash >= Key-> % found best node
+            Key > HashId, ToAskHash >= Key-> % found best node
+              io:format("Ask ~p from ~p",[ToAskPID,self()]),
               ToAskPID ! {finalAddKeyValue,Key,Value},
               NewMap = DataTable;
             true -> % passed best spot
