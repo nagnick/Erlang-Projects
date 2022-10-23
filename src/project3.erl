@@ -56,7 +56,7 @@ chordActor(SuperVisor,HashId)-> % startingPoint of actor
   receive
     {init, MapOfPids}->
       % make a finger table based of map of hash => PID, first make map a list sorted based on hash
-      NewFingerTable = lists:keysort(1,createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[])), % initial FingerTable is empty and start filling fingerTable at index 1
+      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(MapOfPids)),160,[]), % initial FingerTable is empty and start filling fingerTable at index 1
       % finger table is sorted so that the search for next in line actors is most efficient
       %io:format("~w~n",[NewFingerTable]),
       chordActor(SuperVisor,NewFingerTable,HashId,MapOfPids) % fingerTable is filled with {hashID,PID} tuples of the actors in network
@@ -83,7 +83,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
   receive
     {addActor,Pid,Id}-> % Done
       NewMapOfPids = maps:put(Id,Pid,MapOfPids),
-      NewFingerTable = lists:keysort(1,createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[])), % update finger table by making a new one
+      NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[]), % update finger table by making a new one
       chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
 
     {found,Value,Hops}-> % Broken?
@@ -101,22 +101,27 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
           ToAskPID ! {find,Key,SearchersPID}
       end,
       chordActor(SuperVisor,FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
-
-    {addKeyValue,Key,Value}-> % Done
+    {minNodeAddKeyValue,Key,Value} -> % I am smallest node and I hold all the too big key value pairs % work in progress
+      NewMap = maps:put(Key,Value,DataTable),
+      io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
+      SuperVisor ! {dataInserted,Value}, % tell supervisor data is inserted so it knows when to start simulation;
+      chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
+    {addKeyValue,Key,Value}-> % work in progress
       {ToAskHash,ToAskPID} = findActorToAsk(FingerTable,Key), % returns tuple {HashKey, PID}
       if
-        ToAskHash >= Key  -> % Is next actor in finger table a valid choice? or is it trying to loop around so went higher
+        ToAskHash >= HashId-> % normal increase in ring
           if
-            HashId >= ToAskHash -> % looped around to beginning so I am still best choice
+            HashId >= Key -> % next node goes too far I am best choice
               NewMap = maps:put(Key,Value,DataTable),
+              io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
               SuperVisor ! {dataInserted,Value}; % tell supervisor data is inserted so it knows when to start simulation;
             true -> % next actor is best choice
               ToAskPID ! {addKeyValue,Key,Value},
               NewMap = DataTable
           end;
-        true -> % next actor too far up insert in me
-          NewMap = maps:put(Key,Value,DataTable),
-          SuperVisor ! {dataInserted,Value} % tell supervisor data is inserted so it knows when to start simulation;
+        true -> % next actor is bellow me wrapped around special case min node gets key value pair too big to hold
+              ToAskPID ! {minNodeAddKeyValue,Key,Value},
+              NewMap = DataTable
       end,
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum)
   end.
@@ -129,7 +134,7 @@ simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
   init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
-  Data = createCollisionFreeData(400),
+  Data = createCollisionFreeData(15),
   start(ListOfActors,Data,10),
   fillWithData(ListOfActors,Data),
   hopSum(ListOfActors,0,NumberOfActors),
