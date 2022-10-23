@@ -169,7 +169,7 @@ simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
   init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
-  Data = createCollisionFreeData(15),
+  Data = createCollisionFreeData(4000),% always test with same amount of data to get accurate measure of network size to hops required
   distributeSearchSets(ListOfActors,Data,NumberOfRequests),
   fillWithData(ListOfActors,Data),
   start(ListOfActors),
