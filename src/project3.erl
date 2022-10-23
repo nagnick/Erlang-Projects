@@ -18,21 +18,20 @@ findSuccessor(SortedMapList,MinValue,Original)->
   end.
 
 findPredecessor(FingerTable,Key)-> % function searches the list to find the first value grater than or equal to MinValue
-  findPredecessor(FingerTable,Key,hd(FingerTable),hd(FingerTable)).% No predecessor so return successor needs to make another round in loop
+  findPredecessor(FingerTable,Key,hd(FingerTable)).% No predecessor so return successor needs to make another round in loop
 % value in list so return min value of list aka head
-findPredecessor([],_,_, ImmediateSuccessor)-> % if you get to the end of the list return first item in list
-  ImmediateSuccessor;
-findPredecessor(FingerTable,Key,LastBestValue,ImmediateSuccessor)->
+findPredecessor([],_, ImmediateSuccessor)-> % if you get to the end of the list return first item in list
+  ImmediateSuccessor;% fix so if value is
+findPredecessor(FingerTable,Key,LastBestValue)->
   {ActorHash,_} = hd(FingerTable),
   if
-    ActorHash < Key -> % find actor with a large hash that is still less than key looking for
+    Key >= ActorHash -> % find actor with a large hash that is still less than key looking for
       if
         hd(FingerTable) > LastBestValue ->
-          BestValue = hd(FingerTable);
-        true ->
-          BestValue = LastBestValue
-      end,
-      findPredecessor(tl(FingerTable),Key,BestValue,ImmediateSuccessor);
+          findPredecessor(tl(FingerTable),Key,hd(FingerTable));
+        true -> % necessary for max value insert to work aka key is greater than largest actor hash
+          findPredecessor(tl(FingerTable),Key,LastBestValue)
+      end;
     true -> % this item goes to far return last actor that was less than key
       LastBestValue
   end.
