@@ -69,7 +69,7 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       queryListFromInsideActor(SearchSetList,FingerTable),
       chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {queryResult,Result,Hops}->
+    {queryResult,Result,Hops}-> % got result of its search back
       NewSearchSetList = SearchSetList -- [decimalShaHash(Result)],
       %io:format("Found ~s~nFrom~p~n",[Result,self()]), % if fails gets a tuple{badmap,Map}
       if
@@ -122,44 +122,13 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       end,
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
-    {finalAddKeyValue,Key,Value} -> % I am smallest node and I hold all the too big key value pairs % work in progress
+    {finalAddKeyValue,Key,Value} -> % I am node that should hold key, value pair % work in progress
       NewMap = maps:put(Key,Value,DataTable),
       %io:format("My ~p,~w Data Table~w~n",[self(),HashId,NewMap]),
       SuperVisor ! {dataInserted,Value}, % tell supervisor data is inserted so it knows when to start simulation;
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
     {addKeyValue,Key,Value}-> % work in progress
-%%      {PToAskHash,PToAskPID} = findPredecessor(FingerTable,Key),
-%%      {SToAskHash,SToAskPID} = findSuccessor(FingerTable,Key),
-%%      if
-%%        PToAskHash > SToAskHash -> % looped around
-%%          if
-%%            Key >= PToAskHash, Key >= SToAskHash, Key >= HashId -> % put in min node as it is a value greater than biggest node
-%%              SToAskPID ! {finalAddKeyValue,Key,Value},
-%%              NewMap = DataTable;
-%%            Key >= HashId, PToAskHash >= Key-> % predecessor Returned immediate successor and key goes there
-%%              PToAskPID ! {finalAddKeyValue,Key,Value},
-%%              NewMap = DataTable;
-%%            true-> % keep going key smaller than all nodes
-%%              SToAskPID ! {addKeyValue,Key,Value},
-%%              NewMap = DataTable
-%%          end;
-%%        true -> % did not loop around
-%%          if
-%%            Key >= PToAskHash, Key >= SToAskHash, Key >= HashId -> % bigger than all keep going
-%%              SToAskPID ! {addKeyValue,Key,Value},
-%%              NewMap = DataTable;
-%%            SToAskHash >= Key, Key >= PToAskHash, Key >= HashId-> % bigger than me and pree but smaller than succ so go there
-%%              SToAskPID ! {finalAddKeyValue,Key,Value},
-%%              NewMap = DataTable;
-%%            PToAskHash >= Key, Key >= HashId->  % bigger than me but not predecessor so pre must be imendiate suc so go there
-%%              PToAskPID ! {finalAddKeyValue,Key,Value},
-%%              NewMap = DataTable;
-%%            true-> % may be in me or keep going for find insert keep going to be sure I am smallest
-%%              SToAskPID ! {addKeyValue,Key,Value},
-%%              NewMap = DataTable
-%%          end
-%%      end,
       {ToAskHash,ToAskPID} = findPredecessor(FingerTable,Key), % returns tuple {HashKey, PID}
       if
         HashId >= ToAskHash-> % looped to front
@@ -203,7 +172,7 @@ simulate(NumberOfActors,NumberOfRequests)-> % number of request means each actor
   MapOfActors = spawnMultipleActors(NumberOfActors,#{}), % hashed key,PID map returned
   ListOfActors = [X || {_,X} <- maps:to_list(MapOfActors)], % remove hash keys only want pids of actors from now on
   init(ListOfActors,MapOfActors), % init first then start to begin searching(don't want actors to search from actors not done with init)
-  Data = createCollisionFreeData(4000),% always test with same amount of data to get accurate measure of network size to hops required
+  Data = createCollisionFreeData(40000),% always test with same amount of data to get accurate measure of network size to hops required
   distributeSearchSets(ListOfActors,Data,NumberOfRequests),
   fillWithData(ListOfActors,Data),
   start(ListOfActors),
