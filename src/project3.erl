@@ -85,14 +85,18 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       NewFingerTable = createFingerTable(HashId, lists:keysort(1,maps:to_list(NewMapOfPids)),160,[]), % update finger table by making a new one
       chordActor(SuperVisor, NewFingerTable,DataTable,HashId,SearchSetList,NewMapOfPids,HopsRunningSum);
 
-    {found,Value,SearchersPID,Hops}-> % Work In Progress
-      Result = maps:get(Value,DataTable),
+    {found,Key,SearchersPID,Hops}-> % Work In Progress
+      Result = maps:get(Key,DataTable),
       SearchersPID ! {queryResult,Result,Hops},
-      chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum+Hops);
+      chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
     {find,Key,SearchersPID,Hops}-> % Work in Progress
       {ToAskHash,ToAskPID} = findPredecessor(FingerTable,Key), % returns tuple {HashKey, PID}
+      InMyDataTable = checkActorDataTable(DataTable,Key),
       if
+        InMyDataTable-> % if in my data table done return value
+          SearchersPID ! {queryResult,maps:get(Key,DataTable),Hops},
+          NewMap = DataTable;
         HashId >= ToAskHash-> % looped to front
           if
             Key > ToAskHash, Key > HashId -> % value bigger than biggest node so search in smallest node
@@ -125,6 +129,37 @@ chordActor(SuperVisor, FingerTable,DataTable,HashId,SearchSetList, MapOfPids, Ho
       chordActor(SuperVisor, FingerTable,NewMap,HashId,SearchSetList,MapOfPids,HopsRunningSum);
 
     {addKeyValue,Key,Value}-> % work in progress
+%%      {PToAskHash,PToAskPID} = findPredecessor(FingerTable,Key),
+%%      {SToAskHash,SToAskPID} = findSuccessor(FingerTable,Key),
+%%      if
+%%        PToAskHash > SToAskHash -> % looped around
+%%          if
+%%            Key >= PToAskHash, Key >= SToAskHash, Key >= HashId -> % put in min node as it is a value greater than biggest node
+%%              SToAskPID ! {finalAddKeyValue,Key,Value},
+%%              NewMap = DataTable;
+%%            Key >= HashId, PToAskHash >= Key-> % predecessor Returned immediate successor and key goes there
+%%              PToAskPID ! {finalAddKeyValue,Key,Value},
+%%              NewMap = DataTable;
+%%            true-> % keep going key smaller than all nodes
+%%              SToAskPID ! {addKeyValue,Key,Value},
+%%              NewMap = DataTable
+%%          end;
+%%        true -> % did not loop around
+%%          if
+%%            Key >= PToAskHash, Key >= SToAskHash, Key >= HashId -> % bigger than all keep going
+%%              SToAskPID ! {addKeyValue,Key,Value},
+%%              NewMap = DataTable;
+%%            SToAskHash >= Key, Key >= PToAskHash, Key >= HashId-> % bigger than me and pree but smaller than succ so go there
+%%              SToAskPID ! {finalAddKeyValue,Key,Value},
+%%              NewMap = DataTable;
+%%            PToAskHash >= Key, Key >= HashId->  % bigger than me but not predecessor so pre must be imendiate suc so go there
+%%              PToAskPID ! {finalAddKeyValue,Key,Value},
+%%              NewMap = DataTable;
+%%            true-> % may be in me or keep going for find insert keep going to be sure I am smallest
+%%              SToAskPID ! {addKeyValue,Key,Value},
+%%              NewMap = DataTable
+%%          end
+%%      end,
       {ToAskHash,ToAskPID} = findPredecessor(FingerTable,Key), % returns tuple {HashKey, PID}
       if
         HashId >= ToAskHash-> % looped to front
@@ -261,3 +296,12 @@ numberToString(N) when N < 94 -> % 94 possible chars
   [(N+33)]; % 33 = '!' 33 + 93 = 126 = '~' last acceptable char to us
 numberToString(N) when N >= 94->
   numberToString(N div 94) ++ numberToString(N rem 94).
+
+checkActorDataTable(DataTable,Value)->
+  Val = maps:find(Value,DataTable),
+  if
+    Val == error->
+      false;
+    true-> % returned value
+      true
+  end.
